@@ -1,0 +1,28 @@
+{
+    "autoname": "Prompt",
+    "field_order": [
+        "module",
+        "field_name"
+    ],
+    "fields": [
+        {
+            "fieldname": "field_name",
+            "fieldtype": "Link",
+            "label": "Field",
+            "onDelete": "cascade",
+            "onUpdate": "restrict",
+            "options": "DocField"
+        },
+        {
+            "fieldname": "module",
+            "fieldtype": "Link",
+            "label": "Module",
+            "onDelete": "restrict",
+            "onUpdate": "restrict",
+            "options": "Module"
+        }
+    ],
+    "module": "Core",
+    "name": "Doctype",
+    "route": "doctype"
+}

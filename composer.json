@@ -1,0 +1,21 @@
+{
+    "name": "incrusio21/erppackage",
+    "description": "A demo package",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+      {
+        "name": "Abdul Malik Ahmad",
+        "email": "abdul.malik.ahmad997@gmail.com"
+      }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+          "Erp\\": "src/"
+        },
+        "files": [
+          "helper.php"
+        ]
+    }
+  }
