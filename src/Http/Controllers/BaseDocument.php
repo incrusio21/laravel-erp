@@ -8,9 +8,15 @@ use Illuminate\Routing\Controller;
 
 class BaseDocument extends Controller
 {
-    function getdoctype(){
+    function getdoctype(Request $request){
+        $validator = \Validator::make($request->all(), [
+            'doctype' => 'required',
+        ]);
+
+        $docType = doctype_json($request->get('doctype'));
+
         return response()->json([
-            'message' => "Data Berhasil Disimpan."
+            'message' => [$docType]
         ]);
     }
 }

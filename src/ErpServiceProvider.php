@@ -2,8 +2,11 @@
 
 namespace Erp;
 
-use Erp\View\Components\Layout;
+use Erp\Commands\InstallCommand;
 use Erp\Commands\MigrateCommand;
+use Erp\Commands\NewAppCommand;
+use Erp\Commands\UnInstallAppCommand;
+use Erp\View\Components\Layout;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 
@@ -56,7 +59,10 @@ class ErpServiceProvider extends ServiceProvider
             ], 'config');
 
             $this->commands([
+                InstallCommand::class,
                 MigrateCommand::class,
+                NewAppCommand::class,
+                UnInstallAppCommand::class,
             ]);
         }
 

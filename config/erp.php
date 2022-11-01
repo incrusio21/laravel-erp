@@ -13,8 +13,9 @@ return [
     'app' => [
         'logo' => "/assets/erpnext/images/erpnext-logo.svg",
         'module' => [
-            app_path('Modules') => '\App\Modules'
-        ]
+            app_path('Modules') => 'App\Modules'
+        ],
+        'installed_app' => base_path('app.json')
     ],
 
     /*

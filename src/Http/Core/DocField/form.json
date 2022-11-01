@@ -25,5 +25,6 @@
     "is_child": 1,
     "module": "Core",
     "name": "DocField",
-    "parent_name": "DocType"
+    "parent_name": "DocType",
+    "type": "DocType"
 }

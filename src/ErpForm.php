@@ -17,29 +17,40 @@ class ErpForm
      * @return null
      */
     protected function doctpye_form($calback = false)
-    {
-        $list_app = array_merge([ __DIR__.'/Http/Core' => '/Erp/Core'], config('erp.app.module'));
+    {   
+        $installed_app = [];
+        if(\File::exists($installed_path = config('erp.app.installed_app'))) {
+            $installed_list = json_decode(\File::get($installed_path));
+            foreach($installed_list as $path => $namespace){
+                $installed_app += [
+                    base_path($path) => $namespace.'Http'
+                ];
+            } 
+        }
+
+        $list_app = array_merge([ __DIR__.'/Http' => 'Erp\Http'], config('erp.app.module'), $installed_app);
         foreach ($list_app as $path => $value) {
             // skip jika folder tidak d temukan
-            if(!\File::exists($path)) {
+            if(!\File::exists($path.'/modules.txt')) {
                 continue;
             }
 
-            foreach (scandir($path) as $modules) {
-                // skip untuk path '.' atau '..'
-                if ($modules === '.' || $modules === '..') continue;
-                $module = $path.self::DS.$modules;
+            $modules_list = explode("\r\n", \File::get($path.'/modules.txt'));
+            foreach ($modules_list as $key => $name){
+                $module_path = $path.self::DS.str_replace(' ', '', $name);
+                if(!\File::exists($module_path)) {
+                    continue;
+                }
+                
+                foreach (scandir($module_path) as $modules) {
+                    // skip untuk path '.' atau '..'
+                    if ($modules === '.' || $modules === '..') continue;
+                    $module = $module_path.self::DS.$modules;
 
-                if($this->form_json($modules, $module, $calback)) continue;
-
-                if (is_dir($module)) {
-                    foreach (scandir($module) as $docType) {
-                        if ($docType === '.' || $docType === '..') continue;
-                        // dapatkan json modul
-                        $this->form_json($docType, $module.self::DS.$docType, $calback);
-                    }
+                    $this->form_json($modules, $module, $calback);
                 }
             }
+
         }
 
         return $this->form_list;
