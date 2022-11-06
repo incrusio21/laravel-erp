@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Http\Core\Doctype;
+namespace Erp\Http\Core\DoyType\Doctype;
 
 use Illuminate\Support\Collection;
 use Erp\Http\Controllers\Document;

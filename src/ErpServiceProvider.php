@@ -5,6 +5,7 @@ namespace Erp;
 use Erp\Commands\InstallCommand;
 use Erp\Commands\MigrateCommand;
 use Erp\Commands\NewAppCommand;
+use Erp\Commands\NewModuleCommand;
 use Erp\Commands\UnInstallAppCommand;
 use Erp\View\Components\Layout;
 use Illuminate\Support\ServiceProvider;
@@ -62,6 +63,7 @@ class ErpServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 MigrateCommand::class,
                 NewAppCommand::class,
+                NewModuleCommand::class,
                 UnInstallAppCommand::class,
             ]);
         }

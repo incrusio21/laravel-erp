@@ -52,17 +52,29 @@ class InstallCommand extends Command
     public function handle()
     {
         $error = 0;
-
-        $this->components->info('Preparing ERP Installing App.');
+        $installed_app = config('erp.app.installed_app');
         
         $module = $this->argument('module');
         // cek path composer.json benar atau tidak
         if(!\File::exists($composer = base_path('composer.json'))) {
             $this->error('File composer.json tidak di temukan');
-            $error = 1;
+            $this->newLine();
+            return;
         }   
 
         $file   = json_decode(\File::get($composer));
+        if(!property_exists($file->extra, 'merge-plugin') || !in_array($installed_app, $file->extra->{'merge-plugin'}->include)){
+            $this->components->info('Update Installed App File.');
+            $this->components->TwoColumnDetail($installed_app, '<fg=blue;options=bold>UPDATE COMPOSER</>');
+            $this->components->task($installed_app, function () use($composer, $file, $installed_app) {
+                $file->extra->{'merge-plugin'} = (object) [ 'include' => [ $installed_app] ];
+                \File::put($composer, json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            });
+            $this->newLine();
+        }
+
+        $this->components->info('Preparing ERP Installing App.');
+
         // cek jika module yang ingin d install ada atau tidak
         if(!\File::exists($path = base_path($module.'/setup.json'))) {
             $this->error('Module Not Found');
@@ -74,22 +86,18 @@ class InstallCommand extends Command
             $setup = json_decode(\File::get($path));
     
             $this->components->TwoColumnDetail($module, '<fg=blue;options=bold>INSTALLING</>');
-            $this->components->task($module, function () use($composer, $file, $setup) {
-
-                // tambah data psr-4 namespace
-                $file->autoload->{"psr-4"}->{$setup->namespace} = $setup->path;
-                \File::put($composer, json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-        
-                $this->composer->dumpAutoloads();
-
+            $this->components->task($module, function () use($composer, $setup) {
                 // tambah data aplikasi ter install
-                $installed_list = (object) [];
-                if(\File::exists($installed_path = config('erp.app.installed_app'))) {
-                    $installed_list = json_decode(\File::get($installed_path));    
+
+                $installed_list = (object) [ 'autoload' => (object) ['psr-4' => (object) []]];
+                if(\File::exists($installed_path = base_path(config('erp.app.installed_app')) )) {
+                    $installed_list = json_decode(\File::get($installed_path));
                 }
-                
-                $installed_list->{$setup->path} = $setup->namespace;
+
+                $installed_list->autoload->{"psr-4"}->{$setup->namespace} = $setup->path;
                 \File::put($installed_path, json_encode($installed_list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+                $this->composer->dumpAutoloads();
             }); 
         }
 

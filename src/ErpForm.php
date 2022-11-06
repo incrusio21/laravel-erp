@@ -21,13 +21,13 @@ class ErpForm
         $installed_app = [];
         if(\File::exists($installed_path = config('erp.app.installed_app'))) {
             $installed_list = json_decode(\File::get($installed_path));
-            foreach($installed_list as $path => $namespace){
+            foreach($installed_list->autoload->{"psr-4"} as $path => $namespace){
                 $installed_app += [
-                    base_path($path) => $namespace.'Http'
+                    base_path($namespace).'/Http' => $path.'Http'
                 ];
             } 
         }
-
+        
         $list_app = array_merge([ __DIR__.'/Http' => 'Erp\Http'], config('erp.app.module'), $installed_app);
         foreach ($list_app as $path => $value) {
             // skip jika folder tidak d temukan
@@ -37,7 +37,7 @@ class ErpForm
 
             $modules_list = explode("\r\n", \File::get($path.'/modules.txt'));
             foreach ($modules_list as $key => $name){
-                $module_path = $path.self::DS.str_replace(' ', '', $name);
+                $module_path = $path.self::DS.str_replace(' ', '', $name).self::DS.'DocType';
                 if(!\File::exists($module_path)) {
                     continue;
                 }

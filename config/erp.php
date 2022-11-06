@@ -15,7 +15,7 @@ return [
         'module' => [
             app_path('Modules') => 'App\Modules'
         ],
-        'installed_app' => base_path('app.json')
+        'installed_app' => 'app.json'
     ],
 
     /*

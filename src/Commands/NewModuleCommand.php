@@ -9,10 +9,9 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Composer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 
-#[AsCommand(name: 'erp:new-app')]
-class NewAppCommand extends GeneratorCommand
+#[AsCommand(name: 'erp:add-module')]
+class NewModuleCommand extends GeneratorCommand
 {
     use CreatesMatchingTest;
 
@@ -21,7 +20,7 @@ class NewAppCommand extends GeneratorCommand
      *
      * @var string
      */
-    protected $name = 'erp:new-app';
+    protected $name = 'erp:add-module';
 
     /**
      * The name of the console command.
@@ -39,14 +38,15 @@ class NewAppCommand extends GeneratorCommand
      *
      * @var string
      */
-    protected $description = 'Make ERP App';
+    protected $description = 'Add new Module in ERP App';
 
     /**
      * The type of class being generated.
      *
      * @var string
      */
-    protected $type = 'Erp App';
+    protected $type = 'Erp Module';
+
 
     /**
      * The Composer instance.
@@ -85,6 +85,7 @@ class NewAppCommand extends GeneratorCommand
     public function handle()
     {
         $app = $this->argument('app');
+        $module = $this->argument('module');
 
         // First we need to ensure that the given name is not a reserved word within the PHP
         // language and that the class name will actually be valid. If it is not valid we
@@ -95,27 +96,31 @@ class NewAppCommand extends GeneratorCommand
             return false;
         }
 
-        $path = $this->getPath($app);
+        $path = $this->getPath($app.'/src/Http/'.ucfirst($module));
+
+        if (!$this->alreadyExists($app)) {
+            $this->components->error('Create '.ucfirst($app).' App first');
+
+            return false;
+        }
 
         // Next, We will check to see if the class already exists. If it does, we don't want
         // to create the class and overwrite the user's code. So, we will bail out so the
         // code is untouched. Otherwise, we will continue generating this class' files.
         if ((! $this->hasOption('force') || ! $this->option('force')) &&
-            $this->alreadyExists($app)) {
-            $this->components->error($this->type.' already exists.');
+            $this->alreadyExists($app.'/src/Http/'.ucfirst($module))) {
+            $this->components->error($this->type.' in '.ucfirst($app).' already exists.');
 
             return false;
         }
 
-        $this->components->info('Preparing Creating New App.');
+        $this->components->info('Preparing Creating New Module in '.ucfirst($app).'.');
 
-        $this->components->task(ucfirst($app), function () use($path, $app) {
+        $this->components->task(ucfirst($module), function () use($path) {
             // Next, we will generate the path to the location where this class' file should get
             // written. Then, we will build the class and make the proper replacements on the
             // stub files so that it gets the correctly formatted namespace and class name.
-            $this->makeDirectory($app);
-
-            $this->importApp($path, $app);
+            $this->makeDirectory($path);
         });
 
         $this->newLine();
@@ -151,32 +156,9 @@ class NewAppCommand extends GeneratorCommand
     protected function qualifyClass($name)
     {
         $name = ltrim($name, '\\/');
-
         $name = str_replace('/', '\\', $name);
-
+        
         return $name;
-    }
-
-    /**
-     * Get the destination class path.
-     *
-     * @param  string  $name
-     * @return string
-     */
-    protected function importApp($path, $app)
-    {
-        $this->files->put($path.'/setup.json', 
-            $this->sortImports($this->buildClass('setup.json', [
-                '{{ namespace }}' => ucfirst($app),
-                '{{ path }}' => $app .'/src',
-            ]))
-        );
-
-        $this->files->put($path.'/src/Hooks.php', 
-            $this->sortImports($this->buildClass('hooks', [
-                '{{ app }}' => ucfirst($app),
-            ]))
-        );
     }
 
     /**
@@ -187,59 +169,33 @@ class NewAppCommand extends GeneratorCommand
      */
     protected function makeDirectory($path)
     {
+        $app = $this->argument('app');
+        $module = $this->argument('module');
+
         if (! $this->files->isDirectory($path)) {
-            $this->files->makeDirectory($path.'/src/Http', 0777, true, true);
+            $modules = $this->files->get(base_path($app).'/src/Http/modules.txt');
+
+            $this->files->put(base_path($app).'/src/Http/modules.txt', 
+                $modules.PHP_EOL.ucfirst($module)
+            );
             
-            if (!$this->option('only')) {
-                $this->files->put($path.'/src/Http/modules.txt', 
-                    ucfirst($path)
-                );
-                
-                $this->files->makeDirectory($path.'/src/Http/'.ucfirst($path), 0777, true, true);
-            }
+            $this->files->makeDirectory($path, 0777, true, true);
         }
 
         return $path;
     }
-
+    
     /**
      * Resolve the fully-qualified path to the stub.
      *
      * @param  string  $stub
      * @return string
      */
-    protected function resolveStubPath($name)
+    protected function resolveStubPath($stub)
     {
-        return __DIR__."/../../stubs/{$name}.stubs";
-    }
-
-    /**
-     * Build the class with the given name.
-     *
-     * Remove the base controller import if we are already in the base namespace.
-     *
-     * @param  string  $name
-     * @return string
-     */
-    protected function buildClass($name, $replace = [])
-    {
-        $stub = $this->files->get($this->resolveStubPath($name));
-        
-        return str_replace(
-            array_keys($replace), array_values($replace), $stub
-        );
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    protected function getOptions()
-    {
-        return [
-            ['only', 'o', InputOption::VALUE_NONE, 'Generate a only App'],
-        ];
+        return file_exists($customPath = $this->laravel->basePath(trim($stub, '/')))
+            ? $customPath
+            : __DIR__.$stub;
     }
 
     /**
@@ -251,6 +207,7 @@ class NewAppCommand extends GeneratorCommand
     {
         return [
             ['app', InputArgument::REQUIRED, 'The name of app'],
+            ['module', InputArgument::REQUIRED, 'The name of module'],
         ];
     }
 }
