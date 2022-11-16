@@ -21,9 +21,9 @@ class ErpForm
         $installed_app = [];
         if(\File::exists($installed_path = config('erp.app.installed_app'))) {
             $installed_list = json_decode(\File::get($installed_path));
-            foreach($installed_list->autoload->{"psr-4"} as $path => $namespace){
+            foreach($installed_list->autoload->{"psr-4"} as $namespace => $path){
                 $installed_app += [
-                    base_path($namespace).'/Http' => $path.'Http'
+                    base_path($path).'/Http' => $namespace.'Http'
                 ];
             } 
         }

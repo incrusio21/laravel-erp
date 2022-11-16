@@ -7,7 +7,7 @@
     "fields": [
         {
             "fieldname": "field_name",
-            "fieldtype": "Link",
+            "fieldtype": "Table",
             "label": "Field",
             "onDelete": "cascade",
             "onUpdate": "restrict",

@@ -5,18 +5,31 @@ use Erp\Models\DocType;
 
 use Illuminate\Support\HtmlString;
 
-// if (! function_exists('erp_path')) {
-//     /**
-//      * Get the path to the application folder.
-//      *
-//      * @param  string  $path
-//      * @return string
-//      */
-//     function app_path($path = '')
-//     {
-//         return app()->path($path);
-//     }
-// }
+if (! function_exists('hooks')) {
+    /**
+     * Get / set the specified hooks value.
+     *
+     * If an array is passed as the key, we will assume you want to set an array of values.
+     *
+     * @param  array|string|null  $key
+     * @param  mixed  $default
+     * @return mixed|\Erp\Repository
+     */
+    function hooks($key = null, $default = null)
+    {
+        if (is_null($key)) {
+            return app('hooks');
+        }
+        
+        if (is_array($key)) {
+            return app('hooks')->set($key);
+        }
+
+        return app('hooks')->get($key, $default);
+    }
+}
+
+
 if (! function_exists('doctype_json')){
     function doctype_json($docType, $namespace = null)
     {
@@ -68,4 +81,11 @@ function doctype_script(): HtmlString
             erp.boot = $boot
         </script>  
     HTML);
+}
+
+if (! function_exists('erpThrow')) {
+    function erpThrow($message, $title = 'Error API', $code = 400)
+    {
+        throw new \Erp\Exeptions(json_encode(['title' => $title, 'error' => $message]), $code);
+    }
 }
