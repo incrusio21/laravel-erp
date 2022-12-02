@@ -12,12 +12,13 @@ return [
     */
     'app' => [
         'logo' => "/assets/erpnext/images/erpnext-logo.svg",
-        'module' => [
-            app_path('Modules') => 'App\Modules'
-        ],
-        'installed_app' => 'app.json'
+        'path' => 'erp',
+        'filename' => 'app.json'
     ],
 
+    'module' => [
+        app_path('Modules') => 'App\Modules'
+    ],
     /*
     |--------------------------------------------------------------------------
     | ERP Route
@@ -46,6 +47,7 @@ return [
     |
     */
     'table' => [
+        'app' => 'tab_app',
         'module' => 'tab_module',
         'docType' => 'tab_docType',
         'docType_field' => 'tab_docfield',

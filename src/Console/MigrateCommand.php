@@ -1,8 +1,9 @@
 <?php
 
-namespace Erp\Commands;
+namespace Erp\Console;
 
 use Erp\ErpForm;
+use Erp\Models\DocType;
 use Illuminate\Console\Command;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -57,17 +58,18 @@ class MigrateCommand extends Command
         // ambil daftar document erp pada file form.json
         ErpForm::doctpye_form(function ($docType, $form) {
             // baca meta modul
+            $cont   = json_decode(\File::get($form));
+            // simpan daftar document dengan tipe DocType
+            if($cont->type == 'DocType'){
+                array_push($this->doctype, $cont);
+            }
+
             $this->components->TwoColumnDetail($docType, '<fg=yellow;options=bold>RUNNING</>');
-            $this->components->task($docType, function () use($form) {
-                $cont   = json_decode(\File::get($form));
-                if($cont->type == 'DocType'){
-                    array_push($this->doctype, $cont);
-                }
+            $this->components->task($docType, function () use($cont) {
                 if (!Schema::hasTable('tab_'.$cont->name)) {
                     // jika table tidak ada
                     Schema::create('tab_'.$cont->name, function (Blueprint $table) use($cont) {
                         // tambah column
-                        $table->timestamps();
                         $table->string('name')->primary();
                         $this->addColumn($table, $cont);
 
@@ -79,6 +81,7 @@ class MigrateCommand extends Command
                                 $this->addForeign($cont->name, ['foreign' => 'parent_name', 'reference' => 'name', 'parent' => $cont->parent_name]);
                             }
                         }
+                        $table->timestamps();
                     });
                 }else{
                     // jika table ada
@@ -86,10 +89,17 @@ class MigrateCommand extends Command
                         // tambah column
                         $this->addColumn($table, $cont);
 
-                        // cek jika merupakan child table
-                        if (property_exists($cont, 'is_child') && $cont->is_child == 1){
-                            if (!property_exists($cont, 'parent_name')) {
-                                $this->removeForeign($cont->name, ['foreign' => 'parent_name', 'reference' => 'name', 'parent' => $cont->parent_name]);
+                        // cek jika merupakan child table dan bisa memiliki lbih dari satu parent
+                        if (property_exists($cont, 'is_child') && $cont->is_child == 1 ){
+                            $foreignKeys = $this->listTableForeignKeys('tab_'.$cont->name);
+                            $is_exsist = in_array('tab_'.strtolower($cont->name).'_parent_name_foreign', $foreignKeys);
+
+                            if(property_exists($cont, 'parent_name') && $cont->parent_name && !$is_exsist){
+                                $this->addForeign($cont->name, ['foreign' => 'parent_name', 'reference' => 'name', 'parent' => $cont->parent_name]);
+                            }
+
+                            if(!property_exists($cont, 'parent_name') && $is_exsist){
+                                $this->removeForeign($cont->name, ['foreign' => 'tab_'.strtolower($cont->name).'_parent_name_foreign']);
                             }
                         }
                     });
@@ -123,7 +133,8 @@ class MigrateCommand extends Command
                 $this->components->task($doctype, function () use($doctype, $foreign) {
                     Schema::table('tab_'.$doctype, function (Blueprint $table) use($foreign){
                         foreach ($foreign as $value) {
-                            $table->dropForeign([$value['foreign']]);
+                            $table->dropForeign($value['foreign']);
+                            $table->dropIndex($value['foreign']);
                         }
                     });
                 });
@@ -136,9 +147,12 @@ class MigrateCommand extends Command
         if(!empty($this->doctype)){
             $this->components->info('Update Registered DocType.');
             foreach ($this->doctype as $doc) {
-                $this->components->TwoColumnDetail($doctype, '<fg=blue;options=bold>CHECKING IN DB</>');
-                $this->components->task($doctype, function () use($doc) {
-                    
+                $this->components->TwoColumnDetail($doc->name, '<fg=blue;options=bold>CHECKING IN DB</>');
+                $this->components->task($doc->name, function () use($doc) {
+                    DocType::updateOrCreate(
+                        ['name' => $doc->name],
+                        ['module' => $doc->module]
+                    );
                 });
             }
 
@@ -195,5 +209,14 @@ class MigrateCommand extends Command
                 }
             }
         }
+    }
+
+    public function listTableForeignKeys($table)
+    {
+        $conn = Schema::getConnection()->getDoctrineSchemaManager();
+
+        return array_map(function($key) {
+            return $key->getName();
+        }, $conn->listTableForeignKeys($table));
     }
 }

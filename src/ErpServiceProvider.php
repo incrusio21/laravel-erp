@@ -143,7 +143,7 @@ class ErpServiceProvider extends ServiceProvider
      */
     protected function loadCommand()
     {
-        $paths = array_unique(Arr::wrap(__DIR__.'/Commands'));
+        $paths = array_unique(Arr::wrap(__DIR__.'/Console'));
 
         $namespace = __NAMESPACE__.'\\';
 

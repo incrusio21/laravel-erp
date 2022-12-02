@@ -5,7 +5,7 @@ namespace Erp\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class DocType extends Model
+class App extends Model
 {
     use HasFactory;
 
@@ -16,7 +16,7 @@ class DocType extends Model
      */
     protected $fillable = [
         'name',
-        'module'
+        'versi'
     ];
 
     /**
@@ -31,22 +31,14 @@ class DocType extends Model
 
     public function __construct() {
         parent::__construct();
-        $this->setTable(config('erp.table.docType'));
+        $this->setTable(config('erp.table.app'));
     }
 
     /**
-     * Get the field Doctype.
+     * Get the field Modlule.
      */
-    public function field()
+    public function module()
     {
-        return $this->hasMany(DocField::class, 'parent', 'name');
-    }
-
-    /**
-     * Get the module Doctype.
-     */
-    public function modules()
-    {
-        return $this->belongsTo(Module::class, 'module', 'name');
+        return $this->hasMany(Module::class, 'app', 'name');
     }
 }

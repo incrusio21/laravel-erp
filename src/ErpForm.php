@@ -28,7 +28,7 @@ class ErpForm
             } 
         }
         
-        $list_app = array_merge([ __DIR__.'/Http' => 'Erp\Http'], config('erp.app.module'), $installed_app);
+        $list_app = array_merge([ __DIR__.'/Http' => 'Erp\Http'], config('erp.module'), $installed_app);
         foreach ($list_app as $path => $value) {
             // skip jika folder tidak d temukan
             if(!\File::exists($path.'/modules.txt')) {
