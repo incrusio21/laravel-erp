@@ -3,19 +3,49 @@
 namespace Erp\Console;
 
 use Erp\ErpForm;
+use Erp\Models\App;
+use Erp\Traits\CommandTraits;
 use Illuminate\Console\Command;
 use Illuminate\Support\Composer;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputOption;
 use function Termwind\terminal;
 
+#[AsCommand(name: 'erp:uninstall')]
 class UnInstallAppCommand extends Command
 {
+    use CommandTraits;
+
     /**
-     * The name and signature of the console command.
+     * @var array<int, class-string<\Illuminate\Console\Command>>
+     */
+    public const DS = DIRECTORY_SEPARATOR;
+
+    /**
+     * The console command name.
      *
      * @var string
      */
-    protected $signature = 'erp:uninstall 
-                            {app : The name of the app}';
+    protected $name = 'erp:uninstall';
+
+    /**
+     * The name of the console command.
+     *
+     * This name is used to identify the command during lazy loading.
+     *
+     * @var string|null
+     *
+     * @deprecated
+     */
+    protected static $defaultName = 'erp:uninstall';
+
+    /**
+     * The type of class being generated.
+     *
+     * @var string
+     */
+    protected $type = 'Uninstall Erp App';
 
     /**
      * The console command description.
@@ -23,13 +53,6 @@ class UnInstallAppCommand extends Command
      * @var string
      */
     protected $description = 'Uninstall ERP App';
-
-    /**
-     * The type of class being generated.
-     *
-     * @var string
-     */
-    protected $type = 'Erp App';
     
     /**
      * Execute the console command.
@@ -38,45 +61,49 @@ class UnInstallAppCommand extends Command
      */
     public function handle()
     {
-        $error = 0;
+        // cek jika user telah menjalankan init atau belum
+        $this->checkInit();
 
         $app = $this->argument('app');
-        
-        if(!\File::exists($installed_path = base_path($installed_app) )) {
-            $this->error('File '.$installed_app.' tidak di temukan');
+
+        // check if app is exist in database
+        if(!App::where(['name' => $app])->exists()){
             $this->newLine();
-            return;
-        } 
-        
-        $file = json_decode(\File::get($installed_path));
-
-        // cek jika module yang ingin d install ada atau tidak
-        if(!\File::exists($path = base_path($app.'/setup.json'))) {
-            $this->error('App Not Found');
-            $this->newLine();
-            return;
+            $this->error('App '.$app.' not exist.');
+            exit;
         }
-        
-        //update nilai autoload psr-4 pada composer sesuai dengan file setup.json agar dapat di baca aplikasi
-        $setup = json_decode(\File::get($path));
 
-        if(!property_exists($file->autoload->{"psr-4"}, $setup->namespace)){
-            $this->error('App is Not Installed');
-            $error = 1;
-        }
-        
-        if(!$error){
-            $this->components->info('Preparing ERP Removing App.');
+        $this->components->info('Preparing ERP Uninstall App.');
 
-            $this->components->TwoColumnDetail($app, '<fg=red;options=bold>REMOVING</>');
-            $this->components->task($app, function () use($installed_path, $file, $setup) {
-                unset($file->autoload->{"psr-4"}->{$setup->namespace});
-                \File::put($installed_path, json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-                $this->composer->dumpAutoloads();
-            }); 
-        }
+        $this->components->TwoColumnDetail($app, '<fg=red;options=bold>REMOVING</>');
+        $this->components->task($app, function () use($app) {
+            App::where(['name' => $app])->delete();
+        }); 
 
         $this->newLine();
+    }
+
+    /**
+     * Get the console command options.
+     *
+     * @return array
+     */
+    protected function getOptions()
+    {
+        return [
+            ['site', '', InputOption::VALUE_REQUIRED, 'Choice a site to initialize']
+        ];
+    }
+
+    /**
+     * Get the console command arguments.
+     *
+     * @return array
+     */
+    protected function getArguments()
+    {
+        return [
+            ['app', InputArgument::REQUIRED, 'The name of app'],
+        ];
     }
 }

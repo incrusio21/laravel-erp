@@ -139,7 +139,7 @@ class NewModuleCommand extends Command
     protected function getOptions()
     {
         return [
-            ['install', 'i', InputOption::VALUE_REQUIRED, 'Install a Module']
+            ['install', 'i', InputOption::VALUE_NONE, 'Install a Module']
         ];
     }
 

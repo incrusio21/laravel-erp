@@ -97,16 +97,12 @@ trait CommandTraits {
         // check jika nama file telah di masukkan pada composer
         $file   = json_decode(\File::get($composer));
         if(!property_exists($file->extra, 'merge-plugin') 
-            || !in_array($this->app_file, $file->extra->{'merge-plugin'}->include)){
+            || !in_array($this->app_file, $file->extra->{'merge-plugin'}->include)
+            || !Schema::hasTable($this->erp_table['app']) 
+            || !Schema::hasTable($this->erp_table['module'])){
                 $this->error('Run php artisan erp:init first');
                 $this->newLine();
                 exit;
-        }
-        
-        if (!Schema::hasTable($this->erp_table['app']) || !Schema::hasTable($this->erp_table['module'])) {
-            $this->error('Run php artisan erp:init first');
-            $this->newLine();
-            exit;
         }
     }
 
