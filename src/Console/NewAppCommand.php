@@ -66,7 +66,7 @@ class NewAppCommand extends Command
     public function handle()
     {
         // cek jika user telah menjalankan init atau belum
-        if(!$this->checkInit()) return;
+        $this->checkInit();
 
         $app = $this->argument('app');
         

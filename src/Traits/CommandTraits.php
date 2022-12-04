@@ -2,7 +2,11 @@
 
 namespace Erp\Traits;
 
+use Erp\Models\App;
+use Erp\Models\Module;
 use Illuminate\Console\Concerns\CreatesMatchingTest;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Composer;
 
@@ -22,6 +26,13 @@ trait CommandTraits {
      */
     protected $erp_app;
     
+    /**
+     * The ERP folder path.
+     *
+     * @var string
+     */
+    protected $erp_table;
+
     /**
      * The ERP folder path.
      *
@@ -71,15 +82,16 @@ trait CommandTraits {
         $this->composer = $composer;
         $this->files = $files;
         $this->erp_app = config('erp.app');
+        $this->erp_table = config('erp.table');
         $this->setErp_path();
     }
 
-    function checkInit(){
+    function checkInit(){        
         // cek path composer.json benar atau tidak
         if(!\File::exists($composer = base_path('composer.json'))) {
             $this->error('File composer.json tidak di temukan');
             $this->newLine();
-            return;
+            exit;
         } 
         
         // check jika nama file telah di masukkan pada composer
@@ -88,10 +100,14 @@ trait CommandTraits {
             || !in_array($this->app_file, $file->extra->{'merge-plugin'}->include)){
                 $this->error('Run php artisan erp:init first');
                 $this->newLine();
-                return;
+                exit;
         }
-
-        return true;
+        
+        if (!Schema::hasTable($this->erp_table['app']) || !Schema::hasTable($this->erp_table['module'])) {
+            $this->error('Run php artisan erp:init first');
+            $this->newLine();
+            exit;
+        }
     }
 
     /**
@@ -155,5 +171,40 @@ trait CommandTraits {
     protected function setErp_path(){
         $this->erp_app['path'] && $this->erp_path = $this->erp_app['path'].'/';
         $this->app_file = $this->erp_path.$this->erp_app['filename'];
+    }
+
+    protected function updateApp($name){
+        App::updateOrCreate(
+            ['name' => $name],
+            ['versi' => '1.0.0']
+        );
+    }
+
+    protected function checkModule($name, $app){
+        if($module = Module::where(['name' => $name, ['app', '!=', $app]])->first()){
+            $this->newLine();
+            $this->error('Module '.$name.' already used at app ['.$module->app.'].');
+            exit;
+        }
+    }
+
+    protected function updateModule($name, $app, $namespace){    
+        Module::updateOrCreate(
+            ['name' => $name, 'app' => $app],
+            ['namespace' => $namespace]
+        );
+    }
+
+    protected function transaction($callback = false){
+        // mulai transaction agar jika terjdi error. data db tidak terupdate
+        \DB::beginTransaction();
+
+        // baca meta modul
+        if(is_callable($callback)){
+            $callback();
+        }
+
+        // commit smua perubahan pada db yg telah d lakukan
+        \DB::commit();
     }
 }

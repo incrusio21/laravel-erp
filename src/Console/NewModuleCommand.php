@@ -55,56 +55,53 @@ class NewModuleCommand extends Command
     public function handle()
     {
         // cek jika user telah menjalankan init atau belum
-        if(!$this->checkInit()) return;
+        $this->checkInit();
 
         $app = $this->argument('app');
         
-        if(!$this->appExist($app)) return;
+        $this->appExist($app);
 
         $module = $this->argument('module');
 
-        // $path = $this->getPath($app);
+        $path = $this->getPath($app);
 
-        // // Next, We will check to see if the class already exists. If it does, we don't want
-        // // to create the class and overwrite the user's code. So, we will bail out so the
-        // // code is untouched. Otherwise, we will continue generating this class' files.
-        // if ((! $this->hasOption('force') || ! $this->option('force')) &&
-        //     $this->alreadyExists($app)) {
-        //     $this->components->error($this->type.' already exists.');
-
-        //     return false;
-        // }
+        // check jika module telah digunakan oleh app lain
+       $this->checkModule($module, $app);
 
         $this->components->info('Preparing Creating New Module in '.ucfirst($app).'.');
 
-        // $this->components->task(ucfirst($module), function () use($path, $app) {
-        //     // Next, we will generate the path to the location where this class' file should get
-        //     // written. Then, we will build the class and make the proper replacements on the
-        //     // stub files so that it gets the correctly formatted namespace and class name.
-        //     $this->makeDirectory($path, $app);
-        // });
+        $this->components->task(ucfirst($module), function () use($path, $module) {
+            // Next, we will generate the path to the location where this class' file should get
+            // written. Then, we will build the class and make the proper replacements on the
+            // stub files so that it gets the correctly formatted namespace and class name.
+            $this->makeDirectory($path, $module);
+            if (!$this->option('install')) {
+                $this->files->put($path.'/src/Http/modules.txt', 
+                    ucfirst($app)
+                );
+                
+                $this->files->makeDirectory($path.'/src/Http/'.ucfirst($app), 0777, true, true);
+            }
+        });
 
-        // $this->newLine();
+        $this->newLine();
 
-        // $info = $this->type;
+        $info = $this->type;
 
-        // if (in_array(CreatesMatchingTest::class, class_uses_recursive($this))) {
-        //     if ($this->handleTestCreation($path)) {
-        //         $info .= ' and test';
-        //     }
-        // }
+        if (in_array(CreatesMatchingTest::class, class_uses_recursive($this))) {
+            if ($this->handleTestCreation($path)) {
+                $info .= ' and test';
+            }
+        }
 
-        // $this->components->info(sprintf('%s [%s] created successfully.', $info, ucfirst($module)));
+        $this->components->info(sprintf('%s [%s] created successfully.', $info, ucfirst($module)));
     }
     
     protected function appExist($app){
         if (! $this->files->isDirectory($this->getPath($app))) {
             $this->components->error(ucfirst($app).' App not exists.');
-            return;
+            exit;
         }
-
-        return true;
-
     }
 
     /**
@@ -116,19 +113,34 @@ class NewModuleCommand extends Command
      */
     protected function makeDirectory($path, $app)
     {
-        if (! $this->files->isDirectory($path)) {
-            $this->files->makeDirectory($path.'/src/Http', 0777, true, true);
-            
-            if (!$this->option('only')) {
-                $this->files->put($path.'/src/Http/modules.txt', 
-                    ucfirst($app)
-                );
-                
-                $this->files->makeDirectory($path.'/src/Http/'.ucfirst($app), 0777, true, true);
+        if (! $this->files->isDirectory($path.'/src/Http/'.$app)) {
+            $this->files->makeDirectory($path.'/src/Http/'.ucfirst($app), 0777, true, true);
+
+            $modules = $this->files->get($path.'/src/Http/modules.txt');
+
+            if (str_contains($modules, ucfirst($app))){
+                return;
             }
+
+            $this->files->put($path.'/src/Http/modules.txt', 
+                ($modules ? $modules.PHP_EOL : '').ucfirst($app)
+            );
+            
             
             return true;
         }
+    }
+
+    /**
+     * Get the console command options.
+     *
+     * @return array
+     */
+    protected function getOptions()
+    {
+        return [
+            ['install', 'i', InputOption::VALUE_REQUIRED, 'Install a Module']
+        ];
     }
 
     /**

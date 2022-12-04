@@ -1,20 +1,20 @@
 <?php
 
-namespace Erp\Commands;
+namespace Erp\Console;
 
 use Erp\ErpForm;
 use Illuminate\Console\Command;
 use Illuminate\Support\Composer;
 use function Termwind\terminal;
 
-class UnInstallAppCommand extends Command
+class RemoveAppCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'erp:uninstall 
+    protected $signature = 'erp:remove 
                             {app : The name of the app}';
 
     /**
@@ -22,27 +22,14 @@ class UnInstallAppCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Install ERP App';
+    protected $description = 'Remove ERP App from composer';
 
     /**
-     * The Composer instance.
+     * The type of class being generated.
      *
-     * @var \Illuminate\Support\Composer
+     * @var string
      */
-    protected $composer;
-
-    /**
-     * Create a new migration install command instance.
-     *
-     * @param  \Illuminate\Support\Composer  $composer
-     * @return void
-     */
-    public function __construct(Composer $composer)
-    {
-        parent::__construct();
-
-        $this->composer = $composer;
-    }
+    protected $type = 'Erp App';
 
     /**
      * Execute the console command.
@@ -51,8 +38,8 @@ class UnInstallAppCommand extends Command
      */
     public function handle()
     {
-        $error = 0;
-        $installed_app = config('erp.app.installed_app');
+        // cek jika user telah menjalankan init atau belum
+        if(!$this->checkInit()) return;
 
         $app = $this->argument('app');
         
@@ -76,20 +63,18 @@ class UnInstallAppCommand extends Command
 
         if(!property_exists($file->autoload->{"psr-4"}, $setup->namespace)){
             $this->error('App is Not Installed');
-            $error = 1;
+            return;
         }
-        
-        if(!$error){
-            $this->components->info('Preparing ERP Removing App.');
 
-            $this->components->TwoColumnDetail($app, '<fg=red;options=bold>REMOVING</>');
-            $this->components->task($app, function () use($installed_path, $file, $setup) {
-                unset($file->autoload->{"psr-4"}->{$setup->namespace});
-                \File::put($installed_path, json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        $this->components->info('Preparing ERP Removing App.');
 
-                $this->composer->dumpAutoloads();
-            }); 
-        }
+        $this->components->TwoColumnDetail($app, '<fg=red;options=bold>REMOVING</>');
+        $this->components->task($app, function () use($installed_path, $file, $setup) {
+            unset($file->autoload->{"psr-4"}->{$setup->namespace});
+            \File::put($installed_path, json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+            $this->composer->dumpAutoloads();
+        });
 
         $this->newLine();
     }
