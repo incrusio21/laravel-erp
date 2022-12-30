@@ -2,8 +2,8 @@
 
 namespace Erp;
 
+use Erp\DocEventSubscriber;
 use Erp\View\Components\Layout;
-use Erp\Hooks\DocEvent;
 use Illuminate\Console\Application as Artisan;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Queue\Factory as QueueFactoryContract;
@@ -24,10 +24,8 @@ class ErpServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->bind('doc_event', function ($app) {
-            return (new DocEvent($app))->setQueueResolver(function () use ($app) {
-                return $app->make(QueueFactoryContract::class);
-            });
+        $this->app->singleton('sysdefault', function ($app) {
+            return $app->make(Dispatcher::class);
         });
     }
         
@@ -41,9 +39,9 @@ class ErpServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'erp');
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->mergeConfigFrom(__DIR__.'/../config/erp.php', 'erp');
-        // $this->mergeConfigFrom(__DIR__.'/../config/hooks.php', 'hooks');
-
-        // $this->loadHooks();
+        $this->initSysDefault();
+        
+        $this->app->make('sysdefault')->init();
 
         // Register the command if we are using the application via the CLI
         if ($this->app->runningInConsole()) {
@@ -55,8 +53,7 @@ class ErpServiceProvider extends ServiceProvider
         \Vite::useBuildDirectory('resource');
 
         $this->registerRoutes();
-
-        // print_r(hooks('erp', []));
+        $this->registerDocEvent();
     }
     
     protected function loadConsole()
@@ -91,19 +88,9 @@ class ErpServiceProvider extends ServiceProvider
      *
      * @return void
      */
-    protected function loadHooks()
+    protected function registerDocEvent()
     {
-        if(\File::exists($installed_path = config('erp.app.installed_app'))) {
-            $installed_list = json_decode(\File::get($installed_path));
-            $hooks = $this->app->make('hooks');
-
-            foreach($installed_list->autoload->{"psr-4"} as $namespace => $path){
-                
-                $hooks->set($key, array_merge(
-                    require base_path($path).'/hooks.php', $hooks->get($key, [])
-                ));
-            } 
-        }
+        Event::subscribe(DocEventSubscriber::class);
     }
 
     /**
@@ -113,9 +100,7 @@ class ErpServiceProvider extends ServiceProvider
      */
     protected function registerMigrations()
     {
-        // if (Sanctum::shouldRunMigrations()) {
-            return $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        // }
+        return $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 
     protected function registerRoutes()
@@ -160,5 +145,10 @@ class ErpServiceProvider extends ServiceProvider
                 });
             }
         }
+    }
+
+    protected function initSysDefault()
+    {
+        $this->app->make('sysdefault')->init();
     }
 }

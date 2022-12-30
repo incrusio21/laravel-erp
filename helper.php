@@ -1,9 +1,10 @@
 <?php
 
-use Erp\ErpForm;
 use Erp\Models\DocType;
 
 use Illuminate\Support\HtmlString;
+
+define('DS', DIRECTORY_SEPARATOR);
 
 if (! function_exists('hooks')) {
     /**
@@ -29,7 +30,6 @@ if (! function_exists('hooks')) {
     }
 }
 
-
 if (! function_exists('doctype_json')){
     function doctype_json($docType, $namespace = null)
     {
@@ -44,8 +44,8 @@ if (! function_exists('doctype_json')){
 
         try {
             // get doctype json file berdasarkan namespace
-            $file = (new \ReflectionClass('\\'.$namespace.'\\'.$docType.'\Controller'))->getFileName();
-            if(!\File::exists($form = str_replace('controller.php', 'form.json', $file))){
+            $file = (new \ReflectionClass('\\'.$namespace.'\Controller\\'.$docType.'\Controller'))->getFileName();
+            if(!\File::exists($form = str_ireplace('Controller.php', 'form.json', $file))){
                 erpThrow('File tidak ditemukan', 'File Not Found');
             }
             return json_decode(\File::get($form)); 
@@ -55,32 +55,37 @@ if (! function_exists('doctype_json')){
     }
 }
 
-function doctype_script(): HtmlString
-{   
-    $config = [
-        "app_logo_url" => config('erp.app.logo'),
-        'prefix' => [
-            'web' => config('erp.route.web.prefix'),
-            'api' => '/'.config('erp.route.api.prefix')
-        ],
-        'user' => [
-            'can_read' => ErpForm::doctpye_form(function ($docType, $form, $prefix) {
-                // baca meta modul 
-                $cont   = json_decode(\File::get($form));
-                if (!isset($cont->is_child)){
-                    return [$docType];
-                }
-            })
-        ]
-    ];
-    $boot = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    return new HtmlString(<<<HTML
-        <script>
-            if (!window.erp) window.erp = {};
+if (! function_exists('doctype_script')){
+    
+    function doctype_script(): HtmlString
+    {   
+        $erp = app('config')->get('erp');
 
-            erp.boot = $boot
-        </script>  
-    HTML);
+        $config = [
+            "app_logo_url" => $erp['app']['logo'],
+            'prefix' => [
+                'web' => $erp['route']['web']['prefix'],
+                'api' => $erp['route']['api']['prefix']
+            ],
+            'user' => [
+                'can_read' => app('sysdefault')->doctpye_form(function ($docType, $form, $prefix) {
+                    // baca meta modul 
+                    $cont   = json_decode(\File::get($form));
+                    if (!isset($cont->is_child)){
+                        return [$docType];
+                    }
+                })
+            ]
+        ];
+        $boot = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return new HtmlString(<<<HTML
+            <script>
+                if (!window.erp) window.erp = {};
+    
+                erp.boot = $boot
+            </script>  
+        HTML);
+    }
 }
 
 if (! function_exists('erpThrow')) {

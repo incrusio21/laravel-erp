@@ -2,26 +2,15 @@
 
 namespace Erp\Console;
 
-use Erp\ErpForm;
+use Erp\ErpCommand;
 use Erp\Models\App;
-use Erp\Traits\CommandTraits;
-use Illuminate\Console\Command;
-use Illuminate\Support\Composer;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
-use Symfony\Component\Console\Input\InputOption;
 use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:uninstall')]
-class UnInstallAppCommand extends Command
+class UnInstallAppCommand extends ErpCommand
 {
-    use CommandTraits;
-
-    /**
-     * @var array<int, class-string<\Illuminate\Console\Command>>
-     */
-    public const DS = DIRECTORY_SEPARATOR;
-
     /**
      * The console command name.
      *
@@ -81,18 +70,6 @@ class UnInstallAppCommand extends Command
         }); 
 
         $this->newLine();
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    protected function getOptions()
-    {
-        return [
-            ['site', '', InputOption::VALUE_REQUIRED, 'Choice a site to initialize']
-        ];
     }
 
     /**

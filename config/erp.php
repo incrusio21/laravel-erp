@@ -11,14 +11,17 @@ return [
     |
     */
     'app' => [
+        'name' => 'app',
         'logo' => "/assets/erpnext/images/erpnext-logo.svg",
         'path' => 'erp',
-        'filename' => 'app.json'
+        'filename' => 'app.json',
+        'modules' => [
+            'laravel_app' => 'Modules',
+            'installed_app' => 'Http'
+        ],
     ],
 
-    'module' => [
-        app_path('Modules') => 'App\Modules'
-    ],
+    
     /*
     |--------------------------------------------------------------------------
     | ERP Route

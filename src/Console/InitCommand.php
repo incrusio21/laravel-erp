@@ -2,25 +2,14 @@
 
 namespace Erp\Console;
 
-use Erp\Traits\CommandTraits;
-use Illuminate\Console\Concerns\CreatesMatchingTest;
-use Illuminate\Console\Command;
+use Erp\ErpCommand;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Symfony\Component\Console\Input\InputOption;
-use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:init')]
-class InitCommand extends Command
+class InitCommand extends ErpCommand
 {
-    use CommandTraits, CreatesMatchingTest;
-
-    /**
-     * @var array<int, class-string<\Illuminate\Console\Command>>
-     */
-    public const DS = DIRECTORY_SEPARATOR;
-
     /**
      * The console command name.
      *
@@ -53,6 +42,14 @@ class InitCommand extends Command
      */
     protected $description = 'Initialize Laravel ERP';
 
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $is_init = true;
+
     /**
      * Execute the console command.
      *
@@ -68,48 +65,12 @@ class InitCommand extends Command
         $this->components->info('Initialize ERP Packed.');
 
         $this->transaction(function () {
-            $this->components->task('ERP', function () {
+            // installing app pada database
+            foreach (app('sysdefault')->defaultApp(true) as $app => $modules) {
                 // installing app pada database
-                foreach (array_merge(
-                    ['erp' => [ __DIR__.'/../Http' => 'Erp\Http']], 
-                    ['app' => config('erp.module')]
-                ) as $app => $modules) {
-                    $this->init($app, $modules);
-                }
-            }); 
-        });
-        
-        // installing app pada database
-        $this->transaction(function () {
-            // ambil semua app yang telah terdaftar pada composer json erp
-            if($this->files->exists($this->app_file)) {
-                $installed_list = json_decode($this->files->get($this->app_file));
-                
-                foreach($installed_list->autoload->{"psr-4"} as $namespace => $path){
-                    // cek jika module yang ingin d install ada atau tidak
-                    if(!$this->files->exists($setup_path = base_path($this->erp_path.str_replace('src','',$path).'setup.json'))) {
-                        continue;
-                    }
-
-                    $setup = json_decode($this->files->get($setup_path));
-
-                    $this->components->task(ucfirst($setup->name), function () use ($setup, $namespace, $path) {
-                        // installing app pada database
-                        $this->init($setup->name, [$this->erp_path.$path.'/Http' => $namespace.'Http']);
-                    });
-                } 
+                $this->init($app, $modules);
             }
         });
-
-        // $info = $this->type;
-
-        // if (in_array(CreatesMatchingTest::class, class_uses_recursive($this))) {
-        //     if ($this->handleTestCreation($path)) {
-        //         $info .= ' and test';
-        //     }
-        // }
-
-        // $this->components->info(sprintf('%s successfully.', $info));
     }
     
     /**
@@ -118,28 +79,32 @@ class InitCommand extends Command
      * @param string $app
      * @param string $modules
      */
-    protected function init($app, $modules){
+    protected function init($app, array $modules){
         // tambah / edit data app terinstall
         $this->updateApp($app);
         foreach ($modules as $path => $value) {
             // skip jika folder tidak d temukan
-            if(!\File::exists($path.'/modules.txt')) {
+            if(!$this->files->exists($path.'/modules.txt')) {
                 continue;
             }
             
             // check daftar modules terdaftar pada app
-            $modules_list = explode("\r\n", \File::get($path.'/modules.txt'));
+            $modules_list = explode("\r\n", $this->files->get($path.'/modules.txt'));
             foreach ($modules_list as $name){
-                $module_path = $path.self::DS.str_replace(' ', '', $name);
-                if(!\File::exists($module_path)) {
+                $module_path = $path.DS.str_replace(' ', '', $name);
+                if(!$this->files->exists($module_path)) {
                     continue;
                 }
                 
                 // check jika module telah digunakan oleh app lain
                 $this->checkModule($name, $app);
+                $namespace = $value.$name;
 
-                // tambah / edit data module terinstall
-                $this->updateModule($name, $app, $value.self::DS.$name);
+                $this->components->TwoColumnDetail($name, '<fg=blue;options=bold>INSTALLING MODULE</>');
+                $this->components->task($name, function () use($app, $name, $namespace) {
+                    // tambah / edit data module terinstall
+                    $this->updateModule($name, $app, $namespace);
+                });
             }
         }
     }
@@ -148,22 +113,22 @@ class InitCommand extends Command
      * Create Table to database
      */
     protected function createTable(){
-        if (!Schema::hasTable($this->erp_table['app'])) {
-            Schema::create($this->erp_table['app'], function (Blueprint $table) {
+        if (!Schema::hasTable($this->sysdefault->getAppTable('app'))) {
+            Schema::create($this->sysdefault->getAppTable('app'), function (Blueprint $table) {
                 $table->string('name')->primary();
                 $table->string('versi');
                 $table->timestamps();
             });
         }
 
-        if (!Schema::hasTable($this->erp_table['module'])) {
-            Schema::create($this->erp_table['module'], function (Blueprint $table) {
+        if (!Schema::hasTable($this->sysdefault->getAppTable('module'))) {
+            Schema::create($this->sysdefault->getAppTable('module'), function (Blueprint $table) {
                 $table->string('name')->primary();
                 $table->string('namespace');
                 $table->string('app');
                 $table->timestamps();
 
-                $table->foreign('app')->references('name')->on($this->erp_table['app'])->onDelete('cascade');
+                $table->foreign('app')->references('name')->on($this->sysdefault->getAppTable('app'))->onDelete('cascade');
             });
         }
     }
@@ -182,8 +147,8 @@ class InitCommand extends Command
         $file   = json_decode($this->files->get($composer));
            
         $this->components->info('Update Installed App File.');
-        $this->components->TwoColumnDetail($this->app_file, '<fg=blue;options=bold>UPDATE COMPOSER</>');
-        $this->components->task($this->app_file, function () use($composer, $file) {
+        $this->components->TwoColumnDetail($this->sysdefault->getAppFile(), '<fg=blue;options=bold>UPDATE COMPOSER</>');
+        $this->components->task($this->sysdefault->getAppFile(), function () use($composer, $file) {
             $this->makeDirectory($composer, $file);
         });
         
@@ -198,31 +163,31 @@ class InitCommand extends Command
      * @return string
      */
     protected function makeDirectory($composer, $file)
-    {
-        if (! $this->files->isDirectory($this->erp_path)) {
+    {   
+        if (! $this->files->isDirectory($this->sysdefault->getAppPath())) {
             $update_composer = 1;
 
-            $this->files->makeDirectory($this->erp_path, 0777, true, true);
+            $this->files->makeDirectory($this->sysdefault->getAppPath(), 0777, true, true);
 
-            $file->extra->{'merge-plugin'} = (object) [ 'include' => [ $this->app_file ] ];
+            $file->extra->{'merge-plugin'} = (object) [ 'include' => [ str_replace(DS,"/", $this->sysdefault->getAppFile()) ] ];
             $this->files->put($composer, 
                 json_encode($file, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             );
         }
 
-        if(!$this->files->exists($this->app_file)) {
+        if(!$this->files->exists($this->sysdefault->getAppFile())) {
             $installed_list = (object) [ 'autoload' => (object) ['psr-4' => (object) []]];            
-            $this->files->put($this->app_file, json_encode($installed_list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $this->files->put($this->sysdefault->getAppFile(), json_encode($installed_list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         }
 
-        $erp_json = json_decode($this->files->get($this->app_file));
+        $erp_json = json_decode($this->files->get($this->sysdefault->getAppFile()));
 
-        foreach (scandir($this->erp_path) as $name){
+        foreach (scandir($this->sysdefault->getAppPath()) as $name){
             // skip untuk path '.' atau '..'
             if ($name === '.' || $name === '..') continue;
 
-            if($this->files->exists($this->getPath($name.self::DS.'setup.json'))){
-                $setup = json_decode($this->files->get($this->getPath($name.self::DS.'setup.json')));
+            if($this->files->exists($this->getPath($name.DS.'setup.json'))){
+                $setup = json_decode($this->files->get($this->getPath($name.DS.'setup.json')));
                 
                 if(!property_exists($erp_json->autoload->{"psr-4"}, $setup->namespace)){
                     $update_composer = 1;
@@ -232,20 +197,8 @@ class InitCommand extends Command
         }
 
         if(isset($update_composer)){
-            $this->files->put($this->app_file, json_encode($erp_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $this->files->put($this->sysdefault->getAppFile(), json_encode($erp_json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             $this->composer->dumpAutoloads();
         }
-    }
-
-    /**
-     * Get the console command options.
-     *
-     * @return array
-     */
-    protected function getOptions()
-    {
-        return [
-            ['site', '', InputOption::VALUE_REQUIRED, 'Choice a site to initialize']
-        ];
     }
 }

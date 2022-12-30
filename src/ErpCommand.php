@@ -1,16 +1,25 @@
 <?php
 
-namespace Erp\Traits;
+namespace Erp;
 
+use Erp\Dispatcher as SysDefault;
 use Erp\Models\App;
 use Erp\Models\Module;
+use Erp\Traits\CommandTraits;
+use Erp\Traits\ErpTraits;
+use Illuminate\Console\Command;
 use Illuminate\Console\Concerns\CreatesMatchingTest;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Composer;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Console\Input\InputOption;
 
-trait CommandTraits {
+use function Termwind\terminal;
+
+class ErpCommand extends Command
+{
+    use CreatesMatchingTest;
 
     /**
      * The filesystem instance.
@@ -20,11 +29,18 @@ trait CommandTraits {
     protected $files;
 
     /**
-     * The ERP folder path.
+     * The filesystem instance.
      *
-     * @var string
+     * @var \Illuminate\Filesystem\Filesystem
      */
-    protected $erp_app;
+    protected $composer;
+
+    /**
+     * The filesystem instance.
+     *
+     * @var \Illuminate\Filesystem\Filesystem
+     */
+    protected $sysdefault;
     
     /**
      * The ERP folder path.
@@ -33,26 +49,6 @@ trait CommandTraits {
      */
     protected $erp_table;
 
-    /**
-     * The ERP folder path.
-     *
-     * @var string
-     */
-    protected $erp_path;
-
-    /**
-     * The ERP Composer folder path.
-     *
-     * @var string
-     */
-    protected $app_file;
-
-    /**
-     * The Composer instance.
-     *
-     * @var \Illuminate\Support\Composer
-     */
-    protected $composer;
 
     /**
      * Reserved names that cannot be used for generation.
@@ -64,6 +60,13 @@ trait CommandTraits {
         'app'
     ];
 
+        /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $is_init = false;
+
     /**
      * Create a new migration install command instance.
      *
@@ -74,49 +77,46 @@ trait CommandTraits {
     public function __construct(Filesystem $files, Composer $composer)
     {
         parent::__construct();
-
         if (in_array(CreatesMatchingTest::class, class_uses_recursive($this))) {
             $this->addTestOptions();
         }
-
-        $this->composer = $composer;
+        
         $this->files = $files;
-        $this->erp_app = config('erp.app');
-        $this->erp_table = config('erp.table');
-        $this->setErp_path();
+        $this->composer = $composer;
+        $this->sysdefault = app('sysdefault');
+        $this->addSiteOptions();
+
+
+        if(!$this->is_init){
+            // cek jika user telah menjalankan init atau belum
+            $this->checkInit();
+        }
+
     }
 
-    function checkInit(){        
+    protected function checkInit(){   
         // cek path composer.json benar atau tidak
-        if(!\File::exists($composer = base_path('composer.json'))) {
+        if(!$this->files->exists($composer = base_path('composer.json'))) {
             $this->error('File composer.json tidak di temukan');
             $this->newLine();
             exit;
         } 
         
+        
         // check jika nama file telah di masukkan pada composer
-        $file   = json_decode(\File::get($composer));
+        $file   = json_decode($this->files->get($composer));
+        
         if(!property_exists($file->extra, 'merge-plugin') 
-            || !in_array($this->app_file, $file->extra->{'merge-plugin'}->include)
-            || !Schema::hasTable($this->erp_table['app']) 
-            || !Schema::hasTable($this->erp_table['module'])){
+            || !in_array(str_replace(DS,"/", $this->sysdefault->getAppFile()), $file->extra->{'merge-plugin'}->include)
+            || !Schema::hasTable($this->sysdefault->getAppTable('app')) 
+            || !Schema::hasTable($this->sysdefault->getAppTable('module'))){
                 $this->error('Run php artisan erp:init first');
                 $this->newLine();
                 exit;
         }
-    }
 
-    /**
-     * Determine if the class already exists.
-     *
-     * @param  string  $rawName
-     * @return bool
-     */
-    protected function getPath($app)
-    {
-        return $this->erp_path.$app;
     }
-
+    
     /**
      * Alphabetically sorts the imports for the given stub.
      *
@@ -137,6 +137,17 @@ trait CommandTraits {
     }
     
     /**
+     * Determine if the class already exists.
+     *
+     * @param  string  $rawName
+     * @return bool
+     */
+    protected function alreadyExists($rawName)
+    {
+        return $this->files->exists($this->getPath($rawName));
+    }
+
+    /**
      * Build the class with the given name.
      *
      * Remove the base controller import if we are already in the base namespace.
@@ -151,22 +162,6 @@ trait CommandTraits {
         return str_replace(
             array_keys($replace), array_values($replace), $stub
         );
-    }
-
-    /**
-     * Determine if the class already exists.
-     *
-     * @param  string  $rawName
-     * @return bool
-     */
-    protected function alreadyExists($rawName)
-    {
-        return $this->files->exists($this->getPath($rawName));
-    }
-
-    protected function setErp_path(){
-        $this->erp_app['path'] && $this->erp_path = $this->erp_app['path'].'/';
-        $this->app_file = $this->erp_path.$this->erp_app['filename'];
     }
 
     protected function updateApp($name){
@@ -191,9 +186,20 @@ trait CommandTraits {
         );
     }
 
+    /**
+     * Determine if the class already exists.
+     *
+     * @param  string  $rawName
+     * @return bool
+     */
+    protected function getPath($app)
+    {
+        return $this->sysdefault->getAppPath().$app;
+    }
+
     protected function transaction($callback = false){
         // mulai transaction agar jika terjdi error. data db tidak terupdate
-        \DB::beginTransaction();
+        DB::beginTransaction();
 
         // baca meta modul
         if(is_callable($callback)){
@@ -201,6 +207,22 @@ trait CommandTraits {
         }
 
         // commit smua perubahan pada db yg telah d lakukan
-        \DB::commit();
+        DB::commit();
     }
+
+    /**
+     * Get the console command options.
+     *
+     * @return array
+     */
+    protected function addSiteOptions()
+    {
+        $this->getDefinition()->addOption(new InputOption(
+            'site',
+            null,
+            InputOption::VALUE_REQUIRED,
+            'Choice a site to execute command'
+        ));
+    }
+
 }

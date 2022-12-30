@@ -2,19 +2,15 @@
 
 namespace Erp\Console;
 
-use Erp\Traits\CommandTraits;
-use Illuminate\Console\Concerns\CreatesMatchingTest;
-use Illuminate\Console\Command;
+use Erp\ErpCommand;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:new-app')]
-class NewAppCommand extends Command
+class NewAppCommand extends ErpCommand
 {
-    use CommandTraits, CreatesMatchingTest;
-
     /**
      * The console command name.
      *
@@ -66,8 +62,6 @@ class NewAppCommand extends Command
     public function handle()
     {
         // cek jika user telah menjalankan init atau belum
-        $this->checkInit();
-
         $app = $this->argument('app');
         
         if ($this->isReservedApp($app)) {
@@ -75,7 +69,6 @@ class NewAppCommand extends Command
 
             return false;
         }
-
         $path = $this->getPath($app);
 
         // Next, We will check to see if the class already exists. If it does, we don't want
@@ -97,23 +90,6 @@ class NewAppCommand extends Command
             if (!$this->makeDirectory($path, $app)) return false;
 
             $this->importApp($path, $app);
-
-            // cek jika module yang ingin d install ada atau tidak
-            if(!\File::exists($path = $this->getPath($module))) {
-                $this->error('Module Not Found');
-                return;
-            }
-
-            //update nilai autoload psr-4 pada composer sesuai dengan file setup.json agar dapat di baca aplikasi
-            $setup = json_decode(\File::get($path.'/setup.json'));
-            
-            // tambah data aplikasi ter install
-            $installed_list = json_decode(\File::get($this->app_file));
-
-            $installed_list->autoload->{"psr-4"}->{$setup->namespace} = $setup->path;
-            \File::put($this->app_file, json_encode($installed_list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
-            $this->composer->dumpAutoloads();
         });
 
         $this->newLine();

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Routing\Controller;
 
+
 class Document extends Controller
 {
     /**
@@ -26,11 +27,11 @@ class Document extends Controller
      */
     public function __construct()
     {
-        pushData([
-            'title' => 'Tindakan Rawat Jalan'
-        ]);
+        // pushData([
+        //     'title' => 'Tindakan Rawat Jalan'
+        // ]);
         
-        $this->docType = ErpRoute::get_doctype();
+        // $this->docType = ErpRoute::get_doctype();
     }
 
     /**
@@ -42,11 +43,6 @@ class Document extends Controller
     public function index(Request $request)
     {
         $self = Model::doc_list($this->docType->name);
-
-        pushData([
-            'title' => '111',
-            'table' => 'bbb'
-        ]);
         
         method_exists($this, 'on_index') && $on_index = $this->on_index($self);
 
@@ -117,7 +113,7 @@ class Document extends Controller
 
     private function on_validated()
     {
-        $validator = \Validator::make($request->all(), [
+        $validator = validator($request->all(), [
             'nama'          => 'required',
             'jumlah'        => 'required',
             'subTotal'      => 'required',
@@ -152,3 +148,5 @@ class Document extends Controller
         !method_exists($this, 'on_submit') ?: $this->on_submit($this->document);
     }
 }
+
+
