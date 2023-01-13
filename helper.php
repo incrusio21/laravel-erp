@@ -6,30 +6,6 @@ use Illuminate\Support\HtmlString;
 
 define('DS', DIRECTORY_SEPARATOR);
 
-if (! function_exists('hooks')) {
-    /**
-     * Get / set the specified hooks value.
-     *
-     * If an array is passed as the key, we will assume you want to set an array of values.
-     *
-     * @param  array|string|null  $key
-     * @param  mixed  $default
-     * @return mixed|\Erp\Repository
-     */
-    function hooks($key = null, $default = null)
-    {
-        if (is_null($key)) {
-            return app('hooks');
-        }
-        
-        if (is_array($key)) {
-            return app('hooks')->set($key);
-        }
-
-        return app('hooks')->get($key, $default);
-    }
-}
-
 if (! function_exists('doctype_json')){
     function doctype_json($docType, $namespace = null)
     {
@@ -59,13 +35,13 @@ if (! function_exists('doctype_script')){
     
     function doctype_script(): HtmlString
     {   
-        $erp = app('config')->get('erp');
-
+        $route = config('erp.route');
+        
         $config = [
-            "app_logo_url" => $erp['app']['logo'],
+            "app_logo_url" => config('erp.app.logo'),
             'prefix' => [
-                'web' => $erp['route']['web']['prefix'],
-                'api' => $erp['route']['api']['prefix']
+                'web' => $route['web']['prefix'],
+                'api' => $route['api']['prefix']
             ],
             'user' => [
                 'can_read' => app('sysdefault')->doctpye_form(function ($docType, $form, $prefix) {

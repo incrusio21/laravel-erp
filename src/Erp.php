@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Models;
+namespace Erp;
 
 use App\Extensions\BaseDocument;
 use Illuminate\Support\Facades\DB;
@@ -9,8 +9,22 @@ use Illuminate\Support\Collection;
 /**
  * Model General Untuk Document ERP
  */
-class DocumentModels 
+class Erp 
 {   
+    protected $meta;
+    
+    /**
+     * Create a new migration install command instance.
+     *
+     * @param  \Illuminate\Filesystem\Filesystem  $files
+     * @param  \Illuminate\Support\Composer  $composer
+     * @return void
+     */
+    public function __construct()
+    {
+        $this->meta = app('sysdefault')->require_method('erp.models.meta', 'get_meta');
+    }
+
     /**
      * Ambil data field doctype berdasarkan table docfield
      * 
@@ -22,7 +36,7 @@ class DocumentModels
     protected function new_doc($doctype)
     {
         // cek doctype ada atau tidak
-        $document = DocType::with('field')->find($doctype);
+        $document = DB::table($this->getAppTable('docType'))->where('name', $doctype)->first(); //DocType::with('field')->find($doctype);
         if(!$document) erpThrow('DocType tidak ditemukan', 'Not Found');
         
         return new BaseDocument($document);

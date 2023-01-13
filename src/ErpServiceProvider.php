@@ -109,14 +109,14 @@ class ErpServiceProvider extends ServiceProvider
             'prefix' => config('erp.route.api.prefix'),
             'middleware' => config('erp.route.middleware'),
         ], function () {
-            $this->loadRoutesFrom(__DIR__.'/routes/api.php');
+            $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
         });
 
         Route::group([
             'prefix' => config('erp.route.web.prefix'),
             'middleware' => config('erp.route.middleware'),
         ], function () {
-            $this->loadRoutesFrom(__DIR__.'/routes/web.php');
+            $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         });
     }
 
