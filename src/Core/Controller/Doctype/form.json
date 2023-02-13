@@ -1,0 +1,37 @@
+{
+    "autoname": "Prompt",
+    "field_order": [
+        "module",
+        "field_name"
+    ],
+    "fields": [
+        {
+            "fieldname": "field_name",
+            "fieldtype": "Table",
+            "label": "Field",
+            "onDelete": "cascade",
+            "onUpdate": "restrict",
+            "options": "DocField"
+        },
+        {
+            "fieldname": "module",
+            "fieldtype": "Link",
+            "label": "Module",
+            "onDelete": "restrict",
+            "onUpdate": "restrict",
+            "options": "Module"
+        },{
+            "fieldname": "is_child",
+            "fieldtype": "Check",
+            "label": "is_child"
+        },{
+            "fieldname": "custom",
+            "fieldtype": "Check",
+            "label": "Custom"
+        }
+    ],
+    "module": "Core",
+    "name": "Doctype",
+    "route": "doctype",
+    "type": "DocType"
+}

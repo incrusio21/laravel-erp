@@ -1,5 +1,0 @@
-{
-    "name": "{{ name }}",
-    "namespace": "{{ namespace }}\\",
-    "path": "{{ path }}"
-}   

@@ -2,154 +2,143 @@
 
 namespace Erp;
 
-use App\Extensions\BaseDocument;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
+// use Erp\Models\DB as Doctype;
+use Erp\Models\Single;
+use Erp\Foundation\Meta;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Exception;
 
-/**
- * Model General Untuk Document ERP
- */
-class Erp 
-{   
-    protected $meta;
+class Erp
+{
+    use Traits\Utils;
+
+    public $app_modules;
+
+    public $module_app;
+
+    public $controllers;
+
+    public $new_doc_templates = [];
     
     /**
      * Create a new migration install command instance.
      *
      * @param  \Illuminate\Filesystem\Filesystem  $files
-     * @param  \Illuminate\Support\Composer  $composer
      * @return void
      */
-    public function __construct()
-    {
-        $this->meta = app('sysdefault')->require_method('erp.models.meta', 'get_meta');
+    public function __construct(Filesystem $files = null)
+    {   
+        $this->files = $files ?: new Filesystem;
     }
 
-    /**
-     * Ambil data field doctype berdasarkan table docfield
-     * 
-     * @param mixed $document
-     * @param null $parent
-     * 
-     * @return \App\Extensions\BaseDocument
-     */
-    protected function new_doc($doctype)
+    public function get_singles_dict($doctype)
     {
-        // cek doctype ada atau tidak
-        $document = DB::table($this->getAppTable('docType'))->where('name', $doctype)->first(); //DocType::with('field')->find($doctype);
-        if(!$document) erpThrow('DocType tidak ditemukan', 'Not Found');
+        $result = Single::select(['fieldname', 'value'])->where('doctype', $doctype)->get()->toArray();
+
+        return array_reduce($result, function ($carry, $item) {
+            $carry[$item['fieldname']] = $item['value'];
+            return $carry;
+        }, []);
+    }
+
+    // def get_singles_dict(self, doctype, debug=False):
+	// 	"""Get Single DocType as dict.
+
+	// 	:param doctype: DocType of the single object whose value is requested
+
+	// 	Example:
+
+	// 	        # Get coulmn and value of the single doctype Accounts Settings
+	// 	        account_settings = frappe.db.get_singles_dict("Accounts Settings")
+	// 	"""
+	// 	result = self.sql(
+	// 		"""
+	// 		SELECT field, value
+	// 		FROM   `tabSingles`
+	// 		WHERE  doctype = %s
+	// 	""",
+	// 		doctype,
+	// 	)
+
+	// 	dict_ = frappe._dict(result)
+
+	// 	return dict_
+    public function generate_hash($txt = null, $length = null) {
+        $digest = Hash::make($txt . time() . Str::random(8));
+        if ($length) {
+            return substr($digest, 0, $length);
+        }
+        return $digest;
+    }
+
+    public function get_all_apps()
+    {
+        $apps = [];
         
-        return new BaseDocument($document);
-    }
+        [$path, $file] = $this->appFile('app');
 
-    /**
-    * Ambil data document berdasarkan table doctype
-    * 
-    * @param string $doctype
-    * @param null $name
-    * @param array $filter
-    * 
-    * @return \App\Extensions\BaseDocument
-    */
-    protected function get_doc($doctype, $name = null, $filter = [])
-    {
-        // Pesan error jika variable name dan filter kosong
-        if(!$name && !$filter){
-            erpThrow('Tolong isi Name atau Filter terlebih dahulu', 'Pesan');
+        if($this->files->exists($path.$file)) {
+            // throw new LogicException("File Not Found");
         }
 
-        // buat document kosong
-        $data = $this->new_doc($doctype);
-        
-        // get data doctype berdasarkan field pada table docoumen field
-        return $data->set_doc_field(($filter ?: ['name' => $name]));
+        array_push($apps, ['name'=> 'Erp', 'path' => __DIR__]);
+
+        return $apps;
     }
 
-    /**
-     * Ambil data field berdasarkan table docfield
-     * 
-     * @param mixed $document
-     * @param null $parent
-     * 
-     * @return \Illuminate\Support\Collection
-     */
-    protected function get_doc_field($document, $param, $is_parent = true)
+    public function get_module_list($app)
     {
-        try {
-            // get data document dengan select berdasarkan field name dan where berdasarkan param
-            $query = DB::table($document->table_name ?? 'tab_'.$document->name)->select($field_name)->where($param);
+        if(!$this->files->exists($app_name = $app['path'].DS.'modules.txt')) {
+            throw new Exception("File not found at path: " . $app['name']);
+        }
 
-            // jika merukapan document utama cukup ambil data pertama, jika tidak ambil smua data
-            $data = $is_parent ? $query->first() : $query->get();
-            if(!$data) erpThrow('Document tidak ditemukan', 'Not Found');
+        return $this->get_file_items($app_name);
+    }
 
-            // field tambahan jika terdapat field table dll
-            if ($data instanceof \Illuminate\Support\Collection){
-                foreach ($data as $row){
-                    $this->add_fixed_field($row, $document->name, $field_child);
-                }
-            }else{
-                $this->add_fixed_field($data, $document->name, $field_child);
+    public function get_file_items($path, $raiseNotFound = false, $ignoreEmptyLines = true)
+    {
+        $content = $this->files->get($path);
+        if (!empty($content)) {
+            $content = trim($content);
+            $items = explode("\n", $content);
+            if ($ignoreEmptyLines) {
+                $items = array_filter($items, function ($item) {
+                    return !empty(trim($item)) && !str_starts_with($item, "#");
+                });
             }
-        }catch ( \Illuminate\Database\QueryException $e) {
-            erpThrow($e->errorInfo[2], 'Database Error');
+            return $items;
+        } elseif ($raiseNotFound) {
+            throw new Exception("File not found at path: " . $path);
         }
-
-        return $data;
+        return [];
     }
 
-    /**
-     * Tambahkan field nama doctpye dan child jika ada
-     * 
-     * @param mixed $document
-     * @param null $parent
-     * 
-     * @return null
-     */
-    protected function add_fixed_field($row, $doctype, $field_child)
+    
+    public function get_meta($doctype)
     {
-        $row->doctype = $doctype;
-        foreach ($field_child as $field_name => $db_child) {
-            $row->$field_name = $this->get_doc_field($db_child, ['parent' => $row->name], false);
-        }
+        return new Meta($doctype);
     }
 
-    protected function doc_list($doctype, $filter = [])
-    {
-        try {
-            // get data document dengan select berdasarkan field name dan where berdasarkan param
-            $data = DB::table($doctype->table_name ?? 'tab_'.$doctype->name)->get();
-            if(!$data) erpThrow('Document tidak ditemukan', 'Not Found');
-        }catch ( \Illuminate\Database\QueryException $e) {
-            erpThrow($e->errorInfo[2], 'Database Error');
-        }
+    // /**
+    //  * Set a given configuration value.
+    //  *
+    //  * @param  array|string  $key
+    //  * @param  mixed  $value
+    //  * @return void
+    //  */
+    // public function db(string $docType)
+    // {
+    //     return Doctype::doc($docType);
+    // }
 
-        return $data;
-    }
-
-    /**
-     * Handle dynamic method calls into the model.
-     *
-     * @param  string  $method
-     * @param  array  $parameters
-     * @return mixed
-     */
-    public function __call($method, $parameters)
-    {        
-        return $this->$method(...$parameters);
-    }
-
-    /**
-     * Handle dynamic static method calls into the model.
-     *
-     * @param  string  $method
-     * @param  array  $parameters
-     * @return mixed
-     */
-    public static function __callStatic($method, $parameters)
-    {
-        if (in_array($method, ['new_doc', 'get_doc', 'doc_list', 'get_doc_field'])) {
-            return (new static)->$method(...$parameters);   
-        }
-    }
+    // public function get_doc($doctype)
+    // {
+    //     $controller = get_controller($doctype);
+	//     if ($controller){
+	// 	    return controller();
+    //     }
+    //     // return new BaseDocument($doctype)
+    // }
 }

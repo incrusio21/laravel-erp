@@ -1,72 +1,76 @@
 <?php
 
-use Erp\Models\DocType;
-
-use Illuminate\Support\HtmlString;
+use Erp\Facades\SysDefault;
+use Erp\Foundation\Migrate;
+use Erp\Foundation\Utils;
+use Erp\Models\Document;
 
 define('DS', DIRECTORY_SEPARATOR);
 
-if (! function_exists('doctype_json')){
-    function doctype_json($docType, $namespace = null)
+if (! function_exists('new_doc')){
+    function new_doc(string $docType)
     {
-        // get namespace berdasarkan nama doctype 
-        if(!$namespace){
-            // cek doctype ada atau tidak
-            $document = DocType::with('modules')->find($docType);
-            if(!$document) erpThrow('DocType tidak ditemukan', 'Not Found');
-
-            $namespace = $document->modules->namespace;
-        }
-
-        try {
-            // get doctype json file berdasarkan namespace
-            $file = (new \ReflectionClass('\\'.$namespace.'\Controller\\'.$docType.'\Controller'))->getFileName();
-            if(!\File::exists($form = str_ireplace('Controller.php', 'form.json', $file))){
-                erpThrow('File tidak ditemukan', 'File Not Found');
-            }
-            return json_decode(\File::get($form)); 
-        } catch (\Exception $e) {
-            erpThrow('Data Form tidak di temukan', 'Form Not Found');
-        }
+        return Document::doc($docType); 
     }
 }
 
-if (! function_exists('doctype_script')){
-    
-    function doctype_script(): HtmlString
-    {   
-        $route = config('erp.route');
+if (! function_exists('doc_value')){
+    function doc_value(string $docType)
+    {
+        return Document::doc($docType); 
+    }
+}
+
+if (! function_exists('erp')){
+    function erp(string $function, $args)
+    {
+        if (is_string($args)) {
+            $args = [$args];
+        }
         
-        $config = [
-            "app_logo_url" => config('erp.app.logo'),
-            'prefix' => [
-                'web' => $route['web']['prefix'],
-                'api' => $route['api']['prefix']
-            ],
-            'user' => [
-                'can_read' => app('sysdefault')->doctpye_form(function ($docType, $form, $prefix) {
-                    // baca meta modul 
-                    $cont   = json_decode(\File::get($form));
-                    if (!isset($cont->is_child)){
-                        return [$docType];
-                    }
-                })
-            ]
-        ];
-        $boot = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        return new HtmlString(<<<HTML
-            <script>
-                if (!window.erp) window.erp = {};
-    
-                erp.boot = $boot
-            </script>  
-        HTML);
+        return app('erp')->$function(...$args);
     }
 }
 
-if (! function_exists('erpThrow')) {
-    function erpThrow($message, $title = 'Error API', $code = 400)
+if (! function_exists('migrate')){
+    function migrate(Object $cont)
     {
-        throw new \Erp\Exeptions(json_encode(['title' => $title, 'error' => $message]), $code);
+        return (new Migrate)->create_or_update_table($cont); 
+    }
+}
+
+if (! function_exists('sysdefault')){
+    function sysdefault($function, $args = [])
+    {
+        if(method_exists(app('sysdefault'), $function) 
+            && is_callable(array(app('sysdefault'), $function))){
+            return app('sysdefault')->$function(...$args);
+        }   
+    }
+}
+
+if (! function_exists('flags')){
+    function flags($fields, $value = null)
+    {
+        if(is_array($value)){
+            return app('flags')->set($fields, $value);
+        }
+
+        return app('flags')->get($fields, $value);
+    }
+}
+
+// Returns sluggified string. e.g. `Sales Order` becomes `Sales_Order` or `sales_order` if slug true
+if (! function_exists('scrub')){
+    function scrub($txt, $slug = TRUE) {
+        $scrub = str_replace("-", "_", str_replace(" ", "_", $txt));
+        return $slug ? strtolower($scrub) : $scrub;
+    }
+}
+
+// Returns titlified string. e.g. `sales_order` becomes `Sales Order`.
+if (! function_exists('unscrub')){
+    function unscrub($txt) {
+        return ucwords(str_replace("-", " ", str_replace("_", " ", $txt)));
     }
 }

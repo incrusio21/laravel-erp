@@ -16,8 +16,3 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/getdoctype', '\Erp\Http\Controllers\BaseDocument@getdoctype');
 Route::post('/method/{name}', '\Erp\Http\Controllers\BaseDocument@method');
-Route::post('/savedoc', '\Erp\Http\Controllers\BaseDocument@savedoc');
-
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });

@@ -1,0 +1,20 @@
+{
+    "autoname": "prompt",
+    "fields": [
+        {
+            "fieldname": "namespace",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Namespace"
+        },
+        {
+            "fieldname": "app_name",
+            "fieldtype": "Select",
+            "in_list_view": 1,
+            "label": "App Name"
+        }
+    ],
+    "module": "Core",
+    "name": "Module",
+    "type": "DocType"
+}
