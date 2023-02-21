@@ -3,28 +3,25 @@
 namespace Erp;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Application as Artisan;
+use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\Finder\Finder;
 use ReflectionClass;
 
 class ErpServiceProvider extends ServiceProvider
 {
-    use Traits\Console;
-
     /**
      * Register the application's event listeners.
-     *
-     * @return void
      */
-    public function register()
+    public function register() : void
     {
         $this->app->singleton('erp', function ($app) {
-            return new Erp($app->make('files'));
-        });
-
-        $this->app->singleton('sysdefault', function ($app) {
-            return new SysDefault($app->make('files'));
+            return new Init($app->make('files'));
         });
 
         $this->app->singleton('flags', function ($app) {
@@ -34,16 +31,13 @@ class ErpServiceProvider extends ServiceProvider
 
     /**
      * Bootstrap services.
-     *
-     * @return void
      */
-    public function boot()
-    {
+    public function boot() : void
+    {   
+        $this->loadViewsFrom(__DIR__ . '/../views', 'erp');
         $this->mergeConfigFrom(__DIR__.'/../config/erp.php', 'erp');
+        $this->mergeConfigFrom(__DIR__.'/../config/doctype.php', 'doctype');
         $this->setup_module_map();
-
-        Event::subscribe(Events\Subscribe::class);
-        Facades\SysDefault::init();
 
         // Register the command if we are using the application via the CLI
         if ($this->app->runningInConsole()) {
@@ -53,22 +47,19 @@ class ErpServiceProvider extends ServiceProvider
         $this->registerRoutes();
     }
 
-    protected function loadConsole()
+    /**
+     * Registers the web routes for the Erp package.
+     * The function is responsible for registering the web routes that are
+     * associated with the Erp package. This function loads the web.php route file
+     * and prefixes the routes with the desktop prefix specified in the Erp config file.
+    */
+    protected function registerRoutes() : void
     {
-        $this->publishes([
-            __DIR__.'/../config/erp.php' => config_path('erp.php'),
-        ], 'config');
-
-        $this->loadCommand(__NAMESPACE__, __DIR__.DS.'Command');
-    }
-
-    protected function registerRoutes()
-    {
-        Route::group([
-            'prefix' => config('erp.prefix.api'),
-        ], function () {
-            $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
-        });
+        // Route::group([
+        //     'prefix' => config('erp.prefix.api'),
+        // ], function () {
+        //     $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        // });
 
         Route::group([
             'prefix' => config('erp.prefix.desktop'),
@@ -77,14 +68,48 @@ class ErpServiceProvider extends ServiceProvider
         });
     }
 
-    protected function setup_module_map()
+    /**
+     * Load console commands, views, and configuration files for the package.
+    */
+    protected function loadConsole() : void
+    {
+        $this->publishes([
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/erp')
+        ], 'views');
+
+        $this->publishes([
+            __DIR__.'/../config/erp.php' => config_path('erp.php'),
+            __DIR__.'/../config/doctype.php' => config_path('doctype.php'),
+        ], 'config');
+
+        $paths = array_unique(Arr::wrap(__DIR__.DS.'Console'));
+        
+        foreach ((new Finder)->in($paths)->files() as $command) {
+            $command = __NAMESPACE__.'\\'.str_replace(
+                ['/', '.php'],
+                ['\\', ''],
+                Str::after($command->getRealPath(), realpath(__DIR__).DS)
+            );
+            
+            if (is_subclass_of($command, Command::class) && ! (new ReflectionClass($command))->isAbstract()) {
+                Artisan::starting(function ($artisan) use ($command) {
+                    $artisan->resolve($command);
+                });
+            }
+        }
+    }
+    
+    /**
+     * Set up the ERP module map by caching app modules and module app associations.
+    */
+    protected function setup_module_map() : void
     {
         $erp = app('erp');
-
+        
         $erp->app_modules = Cache::get("app_modules", []);
         $erp->module_app = Cache::get("module_app", []);
-    
-        if (!($erp->app_modules && $erp->module_app)){
+        
+        if (empty($erp->app_modules) || empty($erp->module_app)){
             foreach ($erp->get_all_apps() as $app) {
                 $app_name = $app['name'];
                 $erp->app_modules[$app_name] = $erp->app_modules[$app_name] ?? [];
@@ -94,7 +119,7 @@ class ErpServiceProvider extends ServiceProvider
                     $erp->app_modules[$app_name][] = $module;
                 }
             }
-    
+
             Cache::forever("app_modules", $erp->app_modules);
             Cache::forever("module_app",  $erp->module_app);
         }

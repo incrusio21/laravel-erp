@@ -2,9 +2,10 @@
 
 namespace Erp\Traits;
 
-use LogicException;
+use Exception;
 
-trait Utils {
+trait Utils 
+{
 
     protected $doctypes_to_skip = [
         "Communication",
@@ -31,24 +32,21 @@ trait Utils {
         'Module'
     ];
     
-    protected function get_table_name(string $doctype){
+    protected function erpConfig(array $key)
+    {
+        return app('config')->getMany(array_map(fn($value) => "erp.$value", $key));
+    }
+
+    protected function get_table_name(string $doctype)
+    {
         $table = strtolower(
             !str_starts_with($doctype, '__') ? "tab_{$doctype}" : $doctype
         );
 
         if($table == config('erp.singles')){
-            throw new LogicException('Nama Doctype tidak dapat digunkan');
+            throw new Exception('Nama Doctype tidak dapat digunkan');
         }
 
         return $table;
-    }
-
-    protected function appFile($file)
-    {
-        if($path = config('erp.path')){
-            $path .= DS;
-        }
-
-        return [$path, config('erp.'.$file)];
     }
 }

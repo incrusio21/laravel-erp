@@ -1,11 +1,8 @@
 <?php
 
-namespace Erp\Foundation;
+namespace Erp\Modules;
 
-use Erp\Models\DB;
-use Illuminate\Support\Facades\Cache;
-
-class Utils
+class Init
 {
     protected $doctype_php_modules = [];
 
@@ -31,7 +28,7 @@ class Utils
     protected function get_module_name($doctype, $module, $prefix = "", $suffix = "", $app = null)
     {
         $app = $app ?? $this->get_module_app($module);
-        return "\\{$app}\\{$module}\\Controller\\{$doctype}\\{$prefix}Controller{$suffix}";
+        return "\\{$app}\\{$module}\\Controllers\\{$doctype}\\{$prefix}Controller{$suffix}";
     }
 
     protected function get_doctype_module($doctype)

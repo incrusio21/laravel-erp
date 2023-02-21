@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Core\Controller\App;
+namespace Erp\Core\Controllers\App;
 
 use Illuminate\Support\Collection;
 use Erp\Foundation\Document;

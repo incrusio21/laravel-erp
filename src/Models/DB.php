@@ -9,8 +9,7 @@ use LogicException;
 
 class DB extends Model
 {
-    use \Erp\Traits\Models, 
-        Utils, 
+    use \Erp\Traits\Utils, 
         HasFactory;
     
     /**
@@ -29,16 +28,16 @@ class DB extends Model
     public $doc;
 
     public function __construct() {
-        $this->fillable = array_slice($this->default_fields, 1);
+        $this->fillable = array_slice(config('doctype.default_fields'), 1);
 
         parent::__construct();
     }
 
-    public static function doc($table_name)
+    public function scopeDoc($query, $table_name)
     {
-        return (new static)->setDoc($table_name);
+        return $this->setDoc($table_name);
     }
-
+    
     /**
      * Create a new instance of the given model.
      *
@@ -80,15 +79,15 @@ class DB extends Model
 
         $this->table = $this->get_table_name($this->doc);
 
-        if (!$fillable = flags('fillabel', $this->doc)){
-            flags('fillabel', [
-                $this->doc => in_array($this->doc, $this->def_doctype) ? $this->getConnection()->getSchemaBuilder()->getColumnListing($this->table) : []
-            ]);
+        if(!property_exists(app('erp')->flags, 'fillabel')){
+            app('erp')->flags->fillabel = [];
+        } 
 
-            $fillable = flags('fillabel', $this->doc);
+        if(!array_key_exists($this->doc, app('erp')->flags->fillabel)) {
+            app('erp')->flags->fillabel += [$this->doc => in_array($this->doc, $this->def_doctype) ? $this->getConnection()->getSchemaBuilder()->getColumnListing($this->table) : []];
         }
 
-        $this->fillable(array_unique(array_merge($this->fillable, $fillable)));
+        $this->fillable(array_unique(array_merge($this->fillable, app('erp')->flags->fillabel[$this->doc])));
 
         return $this;
     }

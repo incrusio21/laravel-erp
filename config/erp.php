@@ -6,7 +6,7 @@ return [
     | ERP Path
     |--------------------------------------------------------------------------
     |
-    | nilai ini merupakan nama folder dari aplikasi erp yang akan di buat. 
+    | This value is the name of the folder for the ERP application to be created.
     |
     */
     'path' => 'erp',
@@ -16,8 +16,7 @@ return [
     | ERP Composer
     |--------------------------------------------------------------------------
     |
-    | nilai ini merupakan nama composer yang digunakan untuk menyimpan daftar aplikasi
-    | yang akan digunakan  
+    | This value is the name of the composer used to store the list of applications that will be used.
     |
     */
     'composer' => 'composer.json',
@@ -27,8 +26,8 @@ return [
     | ERP App
     |--------------------------------------------------------------------------
     |
-    | nilai ini merupakan nama file yang digunakan untuk menyimpan nama semua app yang 
-    | ada pada direktori  
+    | This value represents the name of the file used to store the names of all 
+    | the applications present in the directory.  
     |
     */
     'app' => 'app.txt',
@@ -38,70 +37,34 @@ return [
     | ERP Module
     |--------------------------------------------------------------------------
     |
-    | nilai ini merupakan nama file yang digunakan untuk menyimpan nama module yang 
-    | ada pada setiap app    
+    | This value represents the filename used to store the module names for each application.
     |
     */
     'modules' => 'modules.txt',
 
     /*
     |--------------------------------------------------------------------------
-    | Default App
-    |--------------------------------------------------------------------------
-    |
-    | nilai ini merupakan nama default app yang dapat dipanggil tanpa harus di simpan 
-    | pada database
-    |
-    */
-    'default_app' => [
-        'name' => 'erp',
-        'path' => __DIR__.DS.'..'.DS.'src',
-        'namespace' =>  'Erp\\'
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | ERP Prefix
-    |--------------------------------------------------------------------------
-    |
-    */
-    'prefix' => [
-        'desktop'   => 'app',
-        'api'       => 'api'
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Table Single
     |--------------------------------------------------------------------------
     |
-    | nama table untuk menyimpan data untuk doctype yang hanya boleh memiliki satu
-    | data (is_single) 
+    | The table name for storing data for doctypes that can only have a single data record (is_single).
     |
     */
     'singles' => 'tab_singles',
 
     /*
     |--------------------------------------------------------------------------
-    | ERP Except Doctype
+    | ERP Prefix
     |--------------------------------------------------------------------------
     |
-    | daftar nama doctype yang tidak dapat digunakan
+    | The prefixes used for the different parts of the ERP system.
+    |
+    | The 'desktop' key specifies the prefix used for the desktop version of the
+    | application, and the 'api' key specifies the prefix used for the API routes.
     |
     */
-    'except_doc' => [
-        'Singles'
+    'prefix' => [
+        'desktop' => 'app',
+        'api' => 'api'
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | ERP Except Doctype
-    |--------------------------------------------------------------------------
-    |
-    | daftar nama field yang bukan merupan nama column pada database
-    |
-    */
-    'except_field' => [
-        'Table',
-    ]
 ];

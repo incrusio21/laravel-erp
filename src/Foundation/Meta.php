@@ -5,45 +5,11 @@ namespace Erp\Foundation;
 use Illuminate\Support\Facades\File;
 use Exception;
 
-function load_doctype_from_file($doctype) {
-    $fname = scrub($doctype, FALSE);
-    $file = __DIR__.DS.'..'.DS.'Core'.DS.'Controller'.DS.$fname.DS.'form.json';
-    // app_path("Core/Doctype/{$fname}/{$fname}.json");
-    if (File::exists($file)) {
-        $txt = json_decode(File::get($file), true);
-
-        $fields = [];
-        foreach ($txt['fields'] as $field) {
-            $field['doctype'] = 'DocField';
-            $fields[] = $field;
-        }
-
-        $permissions = [];
-        if (array_key_exists('permissions', $txt)) {
-            foreach ($txt['permissions'] as $perm) {
-                $perm['doctype'] = 'DocPerm';
-                $permissions[] = $perm;
-            }
-        }
-
-        $txt['fields'] = array_map(function($d) {
-            return new BaseDocument($d);
-        }, $txt['fields']);
-        // $txt['permissions'] = $permissions;
-        
-        return $txt;
-    } else {
-        throw new Exception("{$doctype} not found");
-    }
-}
-
 class Meta extends Document
 {
-    use \Erp\Traits\Models;
-
     protected $_metaclass = True;
-	
-	protected $special_doctypes = [
+
+    protected $special_doctypes = [
         "App",
         "Apps",
 		"DocField",
@@ -53,21 +19,21 @@ class Meta extends Document
 		"DocType Action",
 		"DocType Link",
     ];
-
+    
     /**
      * Create a new migration install command instance.
      * @return void
      */
     public function __construct($doctype)
     {   
-        $this->default_fields = array_slice($this->default_fields, 1);
+        $this->default_fields = array_slice(config('doctype.default_fields'), 1);
 
         $this->_fields = [];
         
         if($doctype instanceof Document){
-            parent::__construct($doctype);
+            $this->__invoke($doctype);
         }else{
-            parent::__construct("DocType", $doctype);
+            $this->__invoke("DocType", $doctype);
         }
 
         $this->process();
@@ -96,7 +62,7 @@ class Meta extends Document
             parent::load_from_db();
         }catch (\Erp\Exceptions\DoesNotExistError $e) {
             if ($this->doctype == "DocType" && in_array($this->name, $this->special_doctypes)) {
-                $this->update(load_doctype_from_file($this->name));
+                $this->update($this->load_doctype_from_file($this->name));
             } else {
                 throw $e;
             }
@@ -107,13 +73,12 @@ class Meta extends Document
     {
         if (!property_exists($this, "_table_fields")) {
             if ($this->name != "DocType") {
-                $this->_table_fields = $this->get("fields", ["fieldtype" => ["in", $this->table_fields]]);
+                $this->_table_fields = $this->get("fields", ["fieldtype" => ["in", config('doctype.table_fields')]]);
             }
         }
 
         return $this->_table_fields;
     }
-
 
     protected function get_field($fieldname = null)
     {
@@ -122,10 +87,9 @@ class Meta extends Document
                 $this->_fields[$f->fieldname] = $f;
             }
         }
-
-        return $this->_fields[$fieldname];
+        return $this->_fields[$fieldname] ?? null;
     }
-
+    
     protected function get_valid_columns()
     {
         if (!property_exists($this, "_valid_columns")) {
@@ -133,7 +97,7 @@ class Meta extends Document
                 array_column(
                     array_filter(
                         $this->get('fields'), function ($df) {
-                            return in_array($df->fieldtype, $this->data_fieldtypes);
+                            return in_array($df->fieldtype, config('doctype.data_fieldtypes'));
                         }
                     ), 'fieldname'
                 )

@@ -8,54 +8,23 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\File;
 use InvalidArgumentException;
 
-const VARCHAR_LEN = 140;
-
 class Migrate
-{    
-    protected $except_field = [];
-
-    protected $index_map = [
-        'Link',
-    ];
-
-    protected $type_map = [
-        "Currency"          => ["decimal", [21,9], 0],
-        "Int"               => ["integer", "11"],
-        "Long Int"          => ["bigInteger", "20"],
-        "Float"             => ["decimal", [21,9], 0],
-        "Percent"           => ["decimal", [21,9], 0],
-        "Check"             => ["boolean", "", 0],
-        "Small Text"        => ["text", ""],
-        "Long Text"         => ["longText", ""],
-        "Code"              => ["longText", ""],
-        "Text Editor"       => ["longText", ""],
-        "Markdown Editor"   => ["longText", ""],
-        "HTML Editor"       => ["longText", ""],
-        "Date"              => ["date", ""],
-        "Datetime"          => ["datetime", "6"],
-        "Time"              => ["time", "6"],
-        "Text"              => ["text", ""],
-        "Data"              => ["string", VARCHAR_LEN],
-        "Link"              => ["string", VARCHAR_LEN],
-        "Dynamic Link"      => ["string", VARCHAR_LEN],
-        "Password"          => ["text", ""],
-        "Select"            => ["string", VARCHAR_LEN],
-        "Rating"            => ["tinyInteger"], "",
-        "Read Only"         => ["string", VARCHAR_LEN],
-        "Attach"            => ["text", ""],
-        "Attach Image"      => ["text", ""],
-        "Signature"         => ["longText", ""],
-        "Color"             => ["string", VARCHAR_LEN],
-        "Barcode"           => ["longText", ""],
-        "Geolocation"       => ["longText", ""],
-        "Duration"          => ["decimal", [21,9], 0],
-        "Icon"              => ["string", VARCHAR_LEN],
-    ];
-
+{
+    /**
+     * Constructs a new instance of the class and initializes the "doctype" property.
+     * @return void
+    */
     public function __construct() {
-        $this->except_field = config('erp.except_field');
+        $this->doctype = config('doctype');
     }
 
+    /**
+     * Creates or updates a database table for a given document type.
+     * 
+     * @param object $cont The document type object containing the table name and fields.
+     * @throws InvalidArgumentException if the document type object does not have either 'name' or 'fields' properties, or the document type is excluded.
+     * @return void
+    */
     public function create_or_update_table($cont)
     {
         if(!(property_exists($cont, 'name') && property_exists($cont, 'fields'))){
@@ -68,8 +37,8 @@ class Migrate
         }
 
         $name = $cont->name;
-        
-        flags('document', [$name => $cont]);
+
+        app('flags')->set('document', [$name => $cont]);
         
         if(property_exists($cont, 'is_single') && $cont->is_single){
             $this->add_single($name, $cont->fields);
@@ -81,7 +50,40 @@ class Migrate
             }
         }
     }
-    
+
+    /**
+     * Add or update single doctype fields.
+     * 
+     * @param string $name Name of the doctype to add fields to.
+     * @param array $fields Array of field objects to add to the doctype.
+     * @return void
+    */
+    protected function add_single($name, $fields)
+    {
+        $docField = [];
+        foreach ($fields as $value) {
+            // jika fieldtype merupakan field khusus (e.x : 'Table') skip 
+            if (in_array($value->fieldtype, $this->doctype['except_field'])){ 
+                continue;
+            }
+            
+            Single::updateOrCreate(
+                ['doctype' => $name, 'fieldname' => $value->fieldname]
+            );
+
+            array_push($docField, $value->fieldname);
+        }
+        Single::where('doctype', $name)->whereNotIn('fieldname', $docField)->delete();
+    }
+
+    /**
+     * Create a database table for a document type.
+     * 
+     * @param string $name The name of the document type to create the table for.
+     * @param array $fields An array of field definitions for the document type.
+     * @param string|null $parent The name of the parent document type if this document type is a child document type.
+     * @return void
+    */
     protected function create_table($name, $fields, $parent = null)
     {
         Schema::create('tab_'.$name, function (Blueprint $table) use($name, $fields, $parent) {
@@ -102,43 +104,44 @@ class Migrate
         });
     }
 
+    /**
+     * Alter an existing table in the database.
+     *
+     * @param string $name The name of the table to alter.
+     * @param array $fields The fields to add or modify in the table.
+     * @param string|null $parent The name of the parent table, if any.
+     * @return void
+     */
     protected function alter_table($name, $fields, $parent = null)
     {
         // ubah table column
         Schema::table('tab_'.$name, function (Blueprint $table) use($name, $fields, $parent){
             // tambah column
             $this->addColumn($table, $name, $fields);
-
-            // $foreignKeys = $this->listTableForeignKeys('tab_'.$name);
-            // $is_exsist = in_array('tab_'.strtolower($name).'_parent_name_foreign', $foreignKeys);
-            
-            // // cek jika merupakan child table dan hanya memiliki satu parent doctype
-            // // if($parent && !$is_exsist){
-            // //     $this->addForeign($name, ['foreign' => 'parent_name', 'reference' => 'name', 'parent' => $parent]);
-            // // }else if(!$parent && $is_exsist) {
-            // //     $table->dropForeign('tab_'.strtolower($name).'_parent_name_foreign');
-            // // }
         });
     }
 
     /**
-     * Tambah kolom pada table
+     * Add columns to a table and create/drop index based on fieldtype
      * 
-     * @param \Illuminate\Database\Schema\Blueprint $table
-     * @param object $cont
-     */
+     * @param \Illuminate\Database\Schema\Blueprint $table The table schema object to add columns to
+     * @param string $table_name The name of the table
+     * @param array $fields The list of fields to add to the table
+     * @throws \InvalidArgumentException if a field type is not found in the type map config
+     * @return void
+    */
     protected function addColumn($table, $table_name, $fields)
     {
         $index = $this->listTableIndexes('tab_'.$table_name);
 
         foreach ($fields as $value) {
             // jika fieldtype merupakan field khusus (e.x : 'Table') skip 
-            if (in_array($value->fieldtype, $this->except_field)){ 
+            if (in_array($value->fieldtype, $this->doctype['except_field'])){ 
                 continue;
             }
 
             // check jika type ada pada file config db_type 
-            if (!array_key_exists($value->fieldtype, $this->type_map)){
+            if (!array_key_exists($value->fieldtype, $this->doctype['type_map'])){
                 throw new InvalidArgumentException("Function [".($value->fieldtype)."] not found.");
             }
 
@@ -159,7 +162,7 @@ class Migrate
                 $column->change();
             }
 
-            $is_index = in_array($value->fieldtype, $this->index_map);
+            $is_index = in_array($value->fieldtype, $this->doctype['index_map']);
             $index_exist = in_array($value->fieldname, $index);
 
             if ($is_index && !$index_exist){ 
@@ -172,32 +175,15 @@ class Migrate
     }
 
     /**
-     * Tambah data pada table single
+     * Get the corresponding database type, length, and default value from the fieldtype
      * 
-     * @param string $name
-     * @param object $fields
-     */
-    protected function add_single($name, $fields)
-    {
-        $docField = [];
-        foreach ($fields as $value) {
-            // jika fieldtype merupakan field khusus (e.x : 'Table') skip 
-            if (in_array($value->fieldtype, $this->except_field)){ 
-                continue;
-            }
-            
-            Single::updateOrCreate(
-                ['doctype' => $name, 'fieldname' => $value->fieldname]
-            );
-
-            array_push($docField, $value->fieldname);
-        }
-        Single::where('doctype', $name)->whereNotIn('fieldname', $docField)->delete();
-    }
-
+     * @param string $fieldtype The fieldtype to get the corresponding database type for
+     * @throws InvalidArgumentException If the fieldtype is not found in the type map
+     * @return array An array containing the corresponding database type, length, and default value
+    */
     protected function type_map($fieldtype)
     {
-        $data = $this->type_map;
+        $data = $this->doctype['type_map'];
 
         if (!array_key_exists($fieldtype, $data)){
             throw new InvalidArgumentException("Function [".($fieldtype)."] not found.");
@@ -209,6 +195,12 @@ class Migrate
             (array_key_exists(2, $data[$fieldtype]) ? $data[$fieldtype][2] : null)];
     }
 
+    /**
+     * Get the list of indexes for the specified table.
+     * 
+     * @param string $table The name of the table.
+     * @return array The array of index names.
+    */
     protected function listTableIndexes($table)
     {
         $conn = Schema::getConnection()->getDoctrineSchemaManager();
