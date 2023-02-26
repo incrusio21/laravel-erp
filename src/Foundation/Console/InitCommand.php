@@ -1,12 +1,11 @@
 <?php
 
-namespace Erp\Console;
+namespace Erp\Foundation\Console;
 
-use Illuminate\Support\Facades\DB;
-use Erp\Foundation\Command;
-use Symfony\Component\Console\Attribute\AsCommand;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Symfony\Component\Console\Attribute\AsCommand;
 use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:init')]
@@ -18,17 +17,6 @@ class InitCommand extends Command
      * @var string
      */
     protected $name = 'erp:init';
-    
-    /**
-     * The name of the console command.
-     *
-     * This name is used to identify the command during lazy loading.
-     *
-     * @var string|null
-     *
-     * @deprecated
-     */
-    protected static $defaultName = 'erp:init';
 
     /**
      * The type of class being generated.
@@ -45,46 +33,14 @@ class InitCommand extends Command
     protected $description = 'Initialize Laravel ERP';
 
     /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $doctype = [];
-
-    /**
      * Execute the console command.
      *
      * @return int
      */
     public function handle()
     {
-        DB::beginTransaction();
-
-        $this->newLine();
-
-        // $this->updateComposer();
-        // $this->initTable();
-
-        $doc = app('erp')->get_doc('Apps');
-        
-        $list_app = array_filter($doc->installed_app, function ($item) {
-            return property_exists($item, 'app_name') && $item->app_name != 'erp';
-        });
-
-        array_unshift($list_app, [
-            'app_name' => 'erp',
-            'versi' => app('erp')->__version__
-        ]);
-
-        $doc->set('installed_app', $list_app);
-
-        $doc->save();
-
-        // $this->addDoctype();
-
-        $this->newLine();
-
-        DB::commit();
+        $this->updateSite();
+        $this->updateComposer();
     }
 
     /**
@@ -94,9 +50,9 @@ class InitCommand extends Command
     {
         $list_update = [];
         // get erp path dan filename
-        if($path = config('erp.path')) $path .= DS;
+        $path = config('erp.path');
         $file = config('erp.composer');
-        $filePath = str_replace(DS,"/", $path.$file);
+        $filePath = str_replace(DS,"/", $this->app->joinPaths($path,$file));
 
         $composer = json_decode($this->files->get(base_path('composer.json')));
         // update composer jika erp composer belum ada
@@ -111,14 +67,12 @@ class InitCommand extends Command
                 $this->updateJsonFile($path, $composer);
             }];
         }
-
-        // buat folde dan file composer jika folder tidak di temukan
+        
+        // buat folder dan file composer jika folder tidak di temukan
         if(!$this->files->exists($path)){
             $list_update += ['addFile' => function () use ($path, $filePath)
             {
-                if (! $this->files->isDirectory($path)) {
-                    $this->files->makeDirectory($path, 0777, true, true);
-                }
+                $this->files->makeDirectory($path, 0777, true, true);
         
                 $this->updateJsonFile($filePath, (object) [ 'autoload' => (object) ['psr-4' => (object) []]]);
             }];
@@ -148,6 +102,8 @@ class InitCommand extends Command
         }
 
         if(!empty($list_update)){
+            $this->newLine();
+
             $bar = $this->output->createProgressBar(count($list_update));
             
             $bar->setFormat('erp_task_percent');
@@ -167,80 +123,24 @@ class InitCommand extends Command
             }
 
             $bar->finish();
+            $this->newLine();
         }
     }
 
     /**
-     * Add Default Database Table
+     * Add Erp Site
      */
-    protected function initTable()
-    { 
-        $doctype = $this->get_doctype(__DIR__.DS.'..');
-
-        $bar = $this->output->createProgressBar(count($doctype) + 1);
-            
-        $bar->setFormat('erp_task_percent');
-        
-        $bar->setMessage('Migration Table       ');
-        $bar->setBarWidth(50);
-        $bar->start();
-
-        sleep(1);
-        
-        if (!Schema::hasTable($single = config('erp.singles'))) {
-            Schema::create($single, function (Blueprint $table) {
-                $table->string('doctype')->nullable();
-                $table->string('fieldname')->nullable();
-                $table->text('value')->nullable();
-                $table->timestamps();
-
-                $table->index(['doctype', 'fieldname']);
-            });
-        }
-            
-        $bar->advance();
-
-        foreach ($doctype as $name) {
-            sleep(1);
-            // baca meta modul
-            $cont   = json_decode($this->files->get($name.DS.'form.json'));
-            if(!(property_exists($cont, 'is_child') && $cont->is_child == 0)){
-                array_push($this->doctype, $cont);
-            }
-            
-            migrate($cont);
-
-            $bar->advance();
-        }
-
-        $bar->finish();
-    }
-
-    /**
-     * Add Default Data Doctype to Database Table
-     */
-    protected function addDoctype()
+    protected function updateSite()
     {
-        // $app = config('erp.default_app');
-        $total = count($this->doctype);
+        if($site = $this->option('site')){
+            // buat folder site jika folder tidak di temukan
+            if(!$this->files->exists(app()->sitePath)){
+                $this->files->makeDirectory(app()->sitePath, 0777, true, true);
+            }
 
-        $bar = $this->output->createProgressBar($total);
-            
-        $bar->setFormat('erp_task_percent');
-        $bar->setMessage('Doctype               ');
-        $bar->setBarWidth(50);
-        $bar->start();
-
-        sleep(1);
-
-        $bar->advance();
-
-        foreach ($this->doctype as $doc) {
-            sleep(1);
-            
-            $bar->advance();
+            $this->call('erp:addsite', [
+                'name' => $site
+            ]);
         }
-
-        $bar->finish();
     }
 }

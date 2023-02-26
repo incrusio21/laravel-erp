@@ -1,25 +1,34 @@
 {
-    "name": "incrusio21/erppackage",
-    "description": "A demo package",
-    "type": "library",
-    "license": "MIT",
-    "authors": [
-      {
-        "name": "Abdul Malik Ahmad",
-        "email": "abdul.malik.ahmad997@gmail.com"
-      }
-    ],
-    "require": {
-      "php": "^8.0.2",
-      "doctrine/dbal": "^3.5",
-      "wikimedia/composer-merge-plugin": "^2.0"
-    },
-    "autoload": {
-        "psr-4": {
-          "Erp\\": "src/"
-        },
-        "files": [
-          "helper.php"
-        ]
+  "name": "incrusio21/erppackage",
+  "description": "A demo package",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Abdul Malik Ahmad",
+      "email": "abdul.malik.ahmad997@gmail.com"
     }
-  }
+  ],
+  "require": {
+    "php": "^8.1",
+    "laravel/framework": "^10.0",
+    "doctrine/dbal": "^3.5",
+    "wikimedia/composer-merge-plugin": "^2.0",
+    "gecche/laravel-multidomain": "10.*"
+  },
+  "autoload": {
+    "psr-4": {
+      "Erp\\": "src/"
+    },
+    "files": [
+      "helper.php"
+    ]
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Erp\\ErpServiceProvider"
+      ]
+    }
+  } 
+}

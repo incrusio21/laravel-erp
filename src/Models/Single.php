@@ -30,6 +30,9 @@ class Single extends Model
      */
     public $incrementing = false;
 
+    /**
+     * Single constructor.
+     */
     public function __construct() {
         parent::__construct();
         $this->setTable(config('erp.singles'));

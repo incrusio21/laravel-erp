@@ -2,38 +2,42 @@
 
 namespace Erp;
 
+use Erp\Contracts\Cache;
 use Erp\Foundation\BaseDocument;
 use Erp\Foundation\Meta;
 use Erp\Models\Single;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Exception;
 
 class Init
 {
-    use Traits\Document;
-
-    public $__version__ = "1.0.0";
-
-    public $app_modules;
-
-    public $module_app;
-
-    public $new_doc_templates = [];
+    // use Traits\Document;
 
     /**
-     * Create a new migration install command instance.
+     * The version of the class.
      *
-     * @param  \Illuminate\Filesystem\Filesystem  $files
+     * @var string
      */
-    public function __construct(Filesystem $files = null)
-    {   
-        $this->files = $files ?: new Filesystem;
-        $this->controllers = (object) [];
+    public $__version__ = "1.0.0";
 
-        $this->flags = new \Erp\Contracts\Flags;
+    /**
+     * Class constructor.
+     *
+     * @param Filesystem|null $files Optional file system instance
+     * @param array $new_doc_templates Array of new document templates
+     * @param array $module_app Array of module applications
+     * @param array $app_modules Array of application modules
+     */
+    public function __construct(
+        public ?Filesystem $files = new Filesystem,
+        public array $module_app,
+        public array $app_modules,
+        public array $new_doc_templates = [])
+    {   
+        $this->controllers = (object) [];
+        $this->flags = new Cache('flags');
         $this->local = (object) [
             'valid_columns' => []
         ];
@@ -59,7 +63,7 @@ class Init
      * Get a list of all the installed applications
      * 
     */
-    public function get_all_apps() : array //The list of all installed applications
+    public function get_all_apps() : array
     {
         $apps = [];
         
@@ -79,7 +83,7 @@ class Init
      * @param array $app Array containing the name and path of the app
      * @throws Exception if the modules file is not found
     */
-    public function get_module_list($app) : array  // Array of module names from the app
+    public function get_module_list($app) : array
     {
         if(!$this->files->exists($app_name = $app['path'].DS.'modules.txt')) {
             throw new Exception("File not found at app: " . $app['name']);
@@ -148,11 +152,11 @@ class Init
      */
     public function new_doc($doctype, $parent_doc = null, $parentfield = null, $as_dict = false) : \Erp\Foundation\BaseDocument
     {
-        if (!array_key_exists($doctype, app('erp')->new_doc_templates)) {
+        if (!array_key_exists($doctype, $this->new_doc_templates)) {
             $this->new_doc_templates[$doctype] = $this->make_new_doc($doctype);
         }
     
-        $doc = clone app('erp')->new_doc_templates[$doctype];
+        $doc = clone $this->new_doc_templates[$doctype];
     
         // set_dynamic_default_values($doc, $parent_doc, $parentfield);
     

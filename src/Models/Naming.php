@@ -8,9 +8,8 @@ class Naming
      * Set a new name for the document.
      *
      * @param object $doc The document to set the name for.
-     * @return void
      */
-    protected function set_new_name($doc)
+    protected function set_new_name(object $doc) : void
     {
         $autoname = $doc->meta->autoname ?? "";
 
@@ -23,8 +22,6 @@ class Naming
         if (!$doc->name && $autoname == "hash"){
             $doc->name = app('erp')->generate_hash($doc->doctype, 10);
         }
-
-        return $doc->name; 
     }
 
     /**
@@ -32,9 +29,8 @@ class Naming
      *
      * @param string $method The name of the method being called.
      * @param array $parameters The parameters to pass to the method being called.
-     * @return mixed
      */
-    public function __call(string $method, array $parameters)
+    public function __call(string $method, array $parameters) : mixed
     {
         return $this->$method(...$parameters);
     }
@@ -44,9 +40,9 @@ class Naming
      *
      * @param string $method The name of the method being called.
      * @param array $parameters The parameters to pass to the method being called.
-     * @return mixed
      */
-    public static function __callStatic(string $method, array $parameters) {
+    public static function __callStatic(string $method, array $parameters) : mixed
+    {
         // Note: value of $name is case sensitive.
         return (new static)->$method(...$parameters);   
     }

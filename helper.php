@@ -3,24 +3,70 @@
 define('DS', DIRECTORY_SEPARATOR);
 define('VARCHAR_LEN', 140);
 
+use Illuminate\Support\Facades\Cache;
+
+/**
+ * Create or update table with migrations.
+ * 
+ * @param object $cont
+*/
 if (! function_exists('migrate')){
-    function migrate(Object $cont)
+    function migrate(object $cont) : void
     {
-        return (new \Erp\Foundation\Migrate)->create_or_update_table($cont); 
+        (new \Erp\Foundation\Migrate)->create_or_update_table($cont); 
     }
 }
 
-// Returns sluggified string. e.g. `Sales Order` becomes `Sales_Order` or `sales_order` if slug true
+/**
+ * Returns sluggified string. e.g. Sales Order becomes Sales_Order or sales_order if $slug true.
+ * 
+ * @param string $txt
+ * @param bool $slug
+*/
 if (! function_exists('scrub')){
-    function scrub($txt, $slug = TRUE) {
+    function scrub($txt, $slug = TRUE) : string
+    {
         $scrub = str_replace("-", "_", str_replace(" ", "_", $txt));
         return $slug ? strtolower($scrub) : $scrub;
     }
 }
 
-// Returns titlified string. e.g. `sales_order` becomes `Sales Order`.
+/**
+ * Returns titlified string. e.g. sales_order becomes Sales Order.
+ * 
+ * @param string $txt
+*/
 if (! function_exists('unscrub')){
-    function unscrub($txt) {
+    function unscrub($txt) : string
+    {
         return ucwords(str_replace("-", " ", str_replace("_", " ", $txt)));
     }
 }
+
+/**
+ * Set up the ERP module map by caching app modules and module app associations.
+ * 
+ * @param bool $reset
+*/
+if (! function_exists('setup_module_map')){
+    function setup_module_map(bool $reset = false) : void
+    {
+        $erp = app('erp');
+        
+        if (empty($erp->app_modules) || empty($erp->module_app) && !$reset){
+            foreach ($erp->get_all_apps() as $app) {
+                $app_name = $app['name'];
+                $erp->app_modules[$app_name] = $erp->app_modules[$app_name] ?? [];
+                foreach ($erp->get_module_list($app) as $module) {
+                    $module = scrub($module, FALSE);
+                    $erp->module_app[$module] = $app_name;
+                    $erp->app_modules[$app_name][] = $module;
+                }
+            }
+
+            Cache::forever("app_modules", $erp->app_modules);
+            Cache::forever("module_app",  $erp->module_app);
+        }
+    }
+}
+

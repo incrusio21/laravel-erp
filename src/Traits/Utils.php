@@ -6,7 +6,6 @@ use Exception;
 
 trait Utils 
 {
-
     protected $doctypes_to_skip = [
         "Communication",
         "ToDo",

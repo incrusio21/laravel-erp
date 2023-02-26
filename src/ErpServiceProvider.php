@@ -2,31 +2,42 @@
 
 namespace Erp;
 
+use Erp\Foundation\Console\AddSiteCommand;
+use Erp\Foundation\Console\InitCommand;
+use Erp\Foundation\Console\StorageLinkCommand;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Console\Application as Artisan;
-use Illuminate\Console\Command;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
-use Symfony\Component\Finder\Finder;
 use ReflectionClass;
 
 class ErpServiceProvider extends ServiceProvider
 {
+    /**
+     * The commands to be registered.
+     *
+     * @var array
+     */
+    protected $commands = [
+        AddSiteCommand::class,
+        InitCommand::class,
+        StorageLinkCommand::class,
+    ];
+
     /**
      * Register the application's event listeners.
      */
     public function register() : void
     {
         $this->app->singleton('erp', function ($app) {
-            return new Init($app->make('files'));
+            return new Init(
+                $app->make('files'),
+                $app->make('cache')->get('app_modules') ?? [],
+                $app->make('cache')->get('module_app') ?? []
+            );
         });
 
-        $this->app->singleton('flags', function ($app) {
-            return new Flags($app->make('cache')->get('flags') ?? []);
-        });
+        $this->app->alias('artisan',\Erp\Console\Application::class);
+
+        $this->commands($this->commands);
     }
 
     /**
@@ -37,7 +48,8 @@ class ErpServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../views', 'erp');
         $this->mergeConfigFrom(__DIR__.'/../config/erp.php', 'erp');
         $this->mergeConfigFrom(__DIR__.'/../config/doctype.php', 'doctype');
-        $this->setup_module_map();
+        $this->mergeConfigFrom(__DIR__.'/../config/site.php', 'site');
+        setup_module_map();
 
         // Register the command if we are using the application via the CLI
         if ($this->app->runningInConsole()) {
@@ -80,48 +92,7 @@ class ErpServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/erp.php' => config_path('erp.php'),
             __DIR__.'/../config/doctype.php' => config_path('doctype.php'),
+            __DIR__.'/../config/site.php' => config_path('site.php'),
         ], 'config');
-
-        $paths = array_unique(Arr::wrap(__DIR__.DS.'Console'));
-        
-        foreach ((new Finder)->in($paths)->files() as $command) {
-            $command = __NAMESPACE__.'\\'.str_replace(
-                ['/', '.php'],
-                ['\\', ''],
-                Str::after($command->getRealPath(), realpath(__DIR__).DS)
-            );
-            
-            if (is_subclass_of($command, Command::class) && ! (new ReflectionClass($command))->isAbstract()) {
-                Artisan::starting(function ($artisan) use ($command) {
-                    $artisan->resolve($command);
-                });
-            }
-        }
-    }
-    
-    /**
-     * Set up the ERP module map by caching app modules and module app associations.
-    */
-    protected function setup_module_map() : void
-    {
-        $erp = app('erp');
-        
-        $erp->app_modules = Cache::get("app_modules", []);
-        $erp->module_app = Cache::get("module_app", []);
-        
-        if (empty($erp->app_modules) || empty($erp->module_app)){
-            foreach ($erp->get_all_apps() as $app) {
-                $app_name = $app['name'];
-                $erp->app_modules[$app_name] = $erp->app_modules[$app_name] ?? [];
-                foreach ($erp->get_module_list($app) as $module) {
-                    $module = scrub($module, FALSE);
-                    $erp->module_app[$module] = $app_name;
-                    $erp->app_modules[$app_name][] = $module;
-                }
-            }
-
-            Cache::forever("app_modules", $erp->app_modules);
-            Cache::forever("module_app",  $erp->module_app);
-        }
     }
 }
