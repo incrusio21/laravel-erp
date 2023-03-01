@@ -16,7 +16,7 @@ specify the version you want.
 This package needs
 
 #### Site Installation  
-To override the detection of the HTTP domain in a minimal set of Laravel core functions 
+To override the detection of the HTTP site in a minimal set of Laravel core functions 
 at the very start of the bootstrap process in order to get the specific environment file. you needs a 
 few more configuration steps than most Laravel packages. 
 
