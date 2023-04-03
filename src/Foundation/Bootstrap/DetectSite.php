@@ -1,6 +1,6 @@
 <?php 
 
-namespace Erp\Foundation\Bootstrap;
+namespace LaravelErp\Foundation\Bootstrap;
 
 use Illuminate\Contracts\Foundation\Application;
 

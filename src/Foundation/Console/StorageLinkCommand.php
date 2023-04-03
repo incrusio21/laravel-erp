@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Foundation\Console;
+namespace LaravelErp\Foundation\Console;
 
 use Symfony\Component\Console\Attribute\AsCommand;
 

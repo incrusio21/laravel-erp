@@ -1,4 +1,4 @@
-<?php namespace Erp\Foundation\Http;
+<?php namespace LaravelErp\Foundation\Http;
 
 use Exception;
 use Illuminate\Routing\Router;
@@ -15,7 +15,7 @@ class Kernel extends \Illuminate\Foundation\Http\Kernel {
 	 * @var array
 	 */
     protected $bootstrappers = [
-        \Erp\Foundation\Bootstrap\DetectSite::class,
+        \LaravelErp\Foundation\Bootstrap\DetectSite::class,
         \Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
         \Illuminate\Foundation\Bootstrap\LoadConfiguration::class,
         \Illuminate\Foundation\Bootstrap\HandleExceptions::class,

@@ -11,13 +11,12 @@
   ],
   "require": {
     "php": "^8.1",
-    "laravel/framework": "^10.0",
     "doctrine/dbal": "^3.5",
-    "wikimedia/composer-merge-plugin": "^2.0"
+    "symfony/process": "^6.2"
   },
   "autoload": {
     "psr-4": {
-      "Erp\\": "src/"
+      "LaravelErp\\": "src/"
     },
     "files": [
       "helper.php"
@@ -26,8 +25,11 @@
   "extra": {
     "laravel": {
       "providers": [
-        "Erp\\ErpServiceProvider"
-      ]
+        "LaravelErp\\ErpServiceProvider"
+      ],
+      "aliases": {
+        "Erp": "LaravelErp\\Facades\\Erp"
+      }
     }
   } 
 }

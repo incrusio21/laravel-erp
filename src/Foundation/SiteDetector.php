@@ -1,4 +1,4 @@
-<?php namespace Erp\Foundation;
+<?php namespace LaravelErp\Foundation;
 
 use Closure;
 use Illuminate\Support\Arr;

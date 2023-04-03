@@ -1,14 +1,14 @@
 <?php
 
-namespace Erp\Foundation\Console;
+namespace LaravelErp\Foundation\Console;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
-use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:addsite')]
 class AddSiteCommand extends Command
@@ -33,36 +33,62 @@ class AddSiteCommand extends Command
     protected  $description = 'Initialize New Site Erp';
 
     /**
-     * Get the stub file for the generator.
      *
-     * @return string
+     * @var boolean
      */
-    protected function getStub()
-    {
-        return $this->resolveStubPath('/stubs/.env.stub');
-    }
+    protected $site_mandatory = TRUE;
 
     /**
      * Execute the console command.
      */
-    protected function new_handle() : void
+    public function handle() : void
     {
+        // buat folder site jika folder tidak di temukan
+        if(!$this->files->exists($this->laravel->sitePath)){
+            $this->files->makeDirectory($this->laravel->sitePath, 0777, true, true);
+        }
+        
         $name = $this->argument('name');
 
         $this->checkCurrentSite($name);
 
-        $sitePath = $this->app->joinPaths($this->app->sitePath, $name);
+        $sitePath = $this->laravel->joinPaths($this->laravel->sitePath, $name);
 
         if($this->files->exists($sitePath)){
+            $this->newLine();
             $this->components->error("The site [{$name}] is already exist.");
             exit;
         }
         
-        [$siteEnvFilePath, $siteEnvFileContents] = $this->createSiteEnvFile($sitePath);
-        
+        $siteEnvArray = $this->createSiteEnvFile($siteEnvFilePath = $this->laravel->joinPaths($sitePath, '.env'));
+        $siteEnvFileContents = $this->makeSiteEnvFileContents($siteEnvArray);
+
         $this->files->makeDirectory($sitePath, 0777, true, true);
         $this->files->put($siteEnvFilePath, $siteEnvFileContents);
         $this->files->makeDirectory($sitePath.DS.config('site.public_storage', 'public'), 0777, true, true);
+        
+        if (!$this->option('no-create-db')) {
+            try {
+                Config::set("database.connections.{$siteEnvArray['DB_CONNECTION']}.database", '');
+                Config::set("database.connections.{$siteEnvArray['DB_CONNECTION']}.username", $siteEnvArray['DB_USERNAME']);
+                Config::set("database.connections.{$siteEnvArray['DB_CONNECTION']}.password", $siteEnvArray['DB_PASSWORD']);
+    
+                $connection = DB::reconnect($siteEnvArray['DB_CONNECTION']);
+    
+                Schema::setConnection($connection)->createDatabase($siteEnvArray['DB_DATABASE']);
+            }catch (\Illuminate\Database\QueryException $e) {
+                $this->components->error("Failed to create database '{$siteEnvArray['DB_DATABASE']}': " . $e->getMessage());
+                exit;
+            }
+        }
+
+        Artisan::call('key:generate', [
+            '--site' => $name
+        ]);
+
+        $this->call('erp:install', [
+            'app' => 'laravel-erp'
+        ]);
     }
 
     /**
@@ -73,7 +99,7 @@ class AddSiteCommand extends Command
     */
     protected function checkCurrentSite(string $name) : void
     {
-        if($this->files->exists($siteFile = $this->app->joinPaths($this->app->sitePath, 'currentsite.txt'))){
+        if($this->files->exists($siteFile = $this->laravel->joinPaths($this->laravel->sitePath, 'currentsite.txt'))){
             $site = $this->files->get($siteFile);
 
             if (str_contains($site, $name)){
@@ -92,94 +118,28 @@ class AddSiteCommand extends Command
     */
     protected function createSiteEnvFile($sitePath)
     {
-        $siteValues = json_decode($this->option("site_value"), true);
+        $siteValues = json_decode(str_replace("'", '"', $this->option("env_values")), true);
 
         if (!is_array($siteValues)) {
             $siteValues = [];
         }
 
-        $envArray = $this->getVarsArray();
+        $db_config = $this->laravel->make('config')->get('site.db_connection');
 
-        $siteEnvFilePath = app()->joinPaths($sitePath, '.env');
-
-        $siteEnvArray = array_merge($envArray, $siteValues);
-        $siteEnvFileContents = $this->makeSiteEnvFileContents($siteEnvArray);
-
-        return [$siteEnvFilePath, $siteEnvFileContents];
-    }
-
-    
-    /**
-     * This method gets the contents of a file formatted as a standard .env file
-     * i.e. with each line in the form of KEY=VALUE
-     * and returns the entries as an array
-     *
-     */
-    protected function getVarsArray() : array
-    {
-        $db_config = config('site.db_connection');
-
-        $database = $db_config['database'].'_'.app('erp')->generate_hash(length:8);
-
-        $envFileContents = $this->buildClass([
+        $envFileContents = $this->buildClass('.env',[
             '{{ connection }}' => $db_config['connection'],
             '{{ host }}' => $db_config['host'],
             '{{ port }}' => $db_config['port'],
-            '{{ database }}' => $database,
+            '{{ database }}' => $db_config['database'].'_'.generate_hash(length:8),
             '{{ username }}' => $db_config['username'],
             '{{ password }}' => $db_config['password'],
         ]);
 
-        $envFileContentsArray = explode("\n", $envFileContents);
-        $varsArray = array();
-        foreach ($envFileContentsArray as $line) {
-            $lineArray = explode('=', $line);
-
-            //Skip the line if there is no '='
-            if (count($lineArray) < 2) {
-                continue;
-            }
-
-            $value = substr($line, strlen($lineArray[0])+1);
-            $varsArray[$lineArray[0]] = trim($value);
-        }
-
-        try {
-            Config::set("database.connections.{$db_config['connection']}.database", '');
-            Config::set("database.connections.{$db_config['connection']}.username", $db_config['username']);
-            Config::set("database.connections.{$db_config['connection']}.password", $db_config['password']);
-
-            $connection = DB::reconnect($db_config['connection']);
-
-            Schema::setConnection($connection)->createDatabase($database);
-        }catch (\Illuminate\Database\QueryException $e) {
-            $this->components->error("Failed to create database '{$database}': " . $e->getMessage());
-            exit;
-        }
-
-        return $varsArray;
+        $envArray = $this->getVarsArray($envFileContents);
+        
+        return array_merge($envArray, $siteValues);
     }
-
-     /**
-     * This method prepares the values of an .env file to be stored
-     * @param $siteValues
-     * @return string
-     */
-    protected function makeSiteEnvFileContents($siteValues)
-    {
-        $contents = '';
-        $previousKeyPrefix = '';
-        foreach ($siteValues as $key => $value) {
-            $keyPrefix = current(explode('_', $key));
-            if ($keyPrefix !== $previousKeyPrefix && !empty($contents)) {
-                $contents .= "\n";
-            }
-            $contents .= $key . '=' . $value . "\n";
-            $previousKeyPrefix = $keyPrefix;
-        }
-        return $contents;
-    }
-
+    
     /**
      * Get the console command arguments.
      *
@@ -199,7 +159,9 @@ class AddSiteCommand extends Command
     protected function getOptions()
     {
         return [
-            ['--site_value', '', InputOption::VALUE_REQUIRED, 'The optional values for the site variables to be stored in the env file (json object)']
+            ['--no-create-db', 'n-db', InputOption::VALUE_NONE, 'Do not automatically create the database'],
+            ['--env_values', '', InputOption::VALUE_REQUIRED, 'The optional values for the site variables to be stored in the env file (json object)'],
+            // ['--storage_link', 'sl', InputOption::VALUE_NONE, 'Create a storage link in public folder'],
         ];
     }
 }

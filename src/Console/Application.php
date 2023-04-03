@@ -1,4 +1,4 @@
-<?php namespace Erp\Console;
+<?php namespace LaravelErp\Console;
 
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputOption;

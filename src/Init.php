@@ -1,19 +1,19 @@
 <?php
 
-namespace Erp;
+namespace LaravelErp;
 
-use Erp\Contracts\Cache;
-use Erp\Foundation\BaseDocument;
-use Erp\Foundation\Meta;
-use Erp\Models\Single;
+use LaravelErp\Contracts\Cache;
+use LaravelErp\Models\Single;
+use LaravelErp\Modules\BaseDocument;
+use LaravelErp\Modules\Meta;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Config;
 use Exception;
 
 class Init
 {
-    // use Traits\Document;
+    use Traits\Document;
 
     /**
      * The version of the class.
@@ -32,51 +32,75 @@ class Init
      */
     public function __construct(
         public ?Filesystem $files = new Filesystem,
-        public array $module_app,
+        public array $all_apps,
         public array $app_modules,
+        public array $module_app,
+        public array $erp_config,
         public array $new_doc_templates = [])
     {   
         $this->controllers = (object) [];
         $this->flags = new Cache('flags');
+
         $this->local = (object) [
             'valid_columns' => []
         ];
     }
 
     /**
-     * Generate a hash string for the given text with additional random data and a timestamp.
+     * Get a list of all the installed applications
      * 
-     * @param string|null $txt The text to be hashed (default: null).
-     * @param int|null $length The length of the output hash (default: null).
     */
-    public function generate_hash($txt = null, $length = null) : string
+    public function app_file() : string
     {
-        $digest = Hash::make($txt . time() . Str::random(8));
-        if ($length) {
-            return substr($digest, 0, $length);
-        }
-        
-        return $digest;
+        return \App::joinPaths($this->erp_config['path'], $this->erp_config['app']);
     }
 
     /**
      * Get a list of all the installed applications
      * 
     */
-    public function get_all_apps() : array
+    public function get_all_apps() : Collection
     {
-        $apps = [];
-        
-        // get erp path dan filename
-        if($this->files->exists(config('erp.path').DS.config('erp.app'))) {
-            
+        $filePath = $this->app_file();
+
+        if (empty($this->all_apps)){
+            // get erp path dan filename
+            if($this->files->exists($filePath)) {
+                foreach (explode("\r\n", $this->files->get($filePath)) as $app) {
+                    $is_app = \App::joinPaths($this->erp_config['path'], $app.DS.'setup.json');
+                    if($this->files->exists($is_app)){
+                        $setup = $this->files->get($is_app);
+                        array_push($this->all_apps,
+                            [
+                                'name' => $app,
+                                'path' => $setup->path,
+                                'namespace' => $setup->namespace 
+                            ]
+                        );
+                    }
+                }
+            }
+
+            array_unshift($this->all_apps, [
+                'name' => 'laravel-erp',
+                'path' => __DIR__,
+                'namespace' => __NAMESPACE__
+            ]);
         }
 
-        array_push($apps, ['name'=> 'Erp', 'path' => __DIR__]);
-
-        return $apps;
+        return new Collection($this->all_apps);
     }
 
+    /**
+     * Get a the installed application
+     * 
+    */
+    public function get_app($name) : array
+    {
+        $apps = new Collection($this->all_apps);
+        return $apps->firstWhere('name', $name) ?? [];
+    }
+    
     /**
      * Get list of modules from an app
      * 
@@ -119,11 +143,11 @@ class Init
     }
     
     /**
-     * Return a `Erp\Foundation\BaseDocument` object of the given type and name .
+     * Return a `LaravelErp\Modules\BaseDocument` object of the given type and name .
      *
      * @param  $arguments
      */
-    public function get_doc(...$arguments) : \Erp\Foundation\BaseDocument
+    public function get_doc(...$arguments) : BaseDocument
     {
         if(!$arguments || empty($arguments)){
             throw new Exception("First non keyword argument must be a string or array");
@@ -150,7 +174,7 @@ class Init
      *
      * @param  $args
      */
-    public function new_doc($doctype, $parent_doc = null, $parentfield = null, $as_dict = false) : \Erp\Foundation\BaseDocument
+    public function new_doc($doctype, $parent_doc = null, $parentfield = null, $as_dict = false) : BaseDocument
     {
         if (!array_key_exists($doctype, $this->new_doc_templates)) {
             $this->new_doc_templates[$doctype] = $this->make_new_doc($doctype);
@@ -167,7 +191,13 @@ class Init
         }
     }
 
-    protected function make_new_doc($doctype) : \Erp\Foundation\BaseDocument
+    /**
+     * Creates a new document of the specified doctype.
+     * 
+     * @param string $doctype The doctype of the document to create.
+     * @return BaseDocument The newly created document.
+    */
+    protected function make_new_doc($doctype) : BaseDocument
     {
         $doc = $this->get_doc([
             "doctype" => $doctype,
@@ -189,6 +219,12 @@ class Init
         return $doc;
     }
 
+    /**
+     * Get the dictionary of single doctype records for the given doctype.
+     * 
+     * @param string $doctype The name of the doctype.
+     * @return array An array of key-value pairs representing the single doctype records.
+    */
     public function get_singles_dict($doctype) : array
     {
         $result = Single::select(['fieldname', 'value'])->where('doctype', $doctype)->get()->toArray();
@@ -204,8 +240,19 @@ class Init
      *
      * @param string $doctype The name of the document type to retrieve metadata for.
      */
-    public function get_meta($doctype) : \Erp\Foundation\Meta
+    public function get_meta($doctype) : Meta
     {
         return new Meta($doctype);
+    }
+
+    /**
+     * Get the app name associated with the given module.
+     * 
+     * @param string $module The name of the module.
+     * @return string|null The name of the app associated with the given module or null if not found.
+    */
+    function get_module_app($module)
+    {
+        return $this->get_app($this->module_app[scrub($module, FALSE)])['namespace'];
     }
 }

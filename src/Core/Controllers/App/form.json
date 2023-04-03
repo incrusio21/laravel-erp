@@ -1,0 +1,23 @@
+{
+    "autoname": "hash",
+    "fields": [
+        {
+            "fieldname": "app_name",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "App Name",
+            "width": 2
+        },
+        {
+            "fieldname": "versi",
+            "fieldtype": "Data",
+            "in_list_view": 1,
+            "label": "Version",
+            "width": 2
+        }
+    ],
+    "is_child": 1,
+    "module": "Core",
+    "name": "App",
+    "type": "DocType"
+}

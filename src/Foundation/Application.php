@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Foundation;
+namespace LaravelErp\Foundation;
 
 use Illuminate\Support\Env;
 use Illuminate\Support\Arr;
@@ -8,6 +8,23 @@ use RuntimeException;
 
 class Application extends \Illuminate\Foundation\Application
 {
+    /**
+     * The calculated site storage path.
+     *
+     * @var string
+     */
+    public string $sitePath;
+
+    /**
+     * The calculated site storage path.
+     *
+     * @var string
+     */
+    public array $serviceForce = [
+        \Illuminate\Database\DatabaseServiceProvider::class,
+        \LaravelErp\ErpServiceProvider::class
+    ];
+
     /**
      * The calculated site storage path.
      *
@@ -28,15 +45,13 @@ class Application extends \Illuminate\Foundation\Application
      */
     public function __construct(
         string|null $basePath = null, 
-        public string|null $sitePath = null, 
+        string|null $sitePath = null, 
         public array $siteParams = [])
     {
-
-        if(file_exists($environmentPath = $basePath.DS.$sitePath)){
-            $this->useEnvironmentPath(rtrim($environmentPath,'\/'));
+        if(is_dir($this->sitePath = $this->joinPaths($basePath, $sitePath))){
+            $this->useEnvironmentPath(rtrim($this->sitePath,'\/'));
         }
         
-
         parent::__construct($basePath);
     }
 
@@ -45,15 +60,20 @@ class Application extends \Illuminate\Foundation\Application
      *
      * @param array|string $envs
      */
-    public function detectSite() : void
+    public function detectSite($name = null) : void
     {
-        $args = isset($_SERVER['argv']) ? $_SERVER['argv'] : null;
+        $args = $name ?: $_SERVER['argv'] ?? null;
+
         $siteDetectionFunctionWeb = Arr::get($this->siteParams, 'site_detection_function_web');
         $siteDetector = new SiteDetector($siteDetectionFunctionWeb);
         $fullSite = $siteDetector->detect($args);
         list($site_scheme, $site_name, $site_port) = $siteDetector->split($fullSite);
         $this->full_site = $fullSite;
         $this->site = $site_name;
+        if(!$this->site && file_exists($sites = $this->joinPaths($this->sitePath,'currentsite.txt'))){
+            $site_list = explode("\r\n", file_get_contents($sites));
+            $this->site = $site_list[0];
+        }
         $this->site_scheme = $site_scheme;
         $this->site_port = $site_port;
         
@@ -70,6 +90,16 @@ class Application extends \Illuminate\Foundation\Application
         if (!$this->siteDetected) $this->detectSite();
     }
 
+    /**
+     * Get the path to the environment file directory.
+     *
+     * @return string
+     */
+    public function environmentPath()
+    {
+        return (is_dir($this->sitePath) && $this->sitePath != $this->environmentPath ? $this->sitePath : $this->environmentPath) ?: $this->basePath;
+    }
+    
     /**
      * Get the environment file the application is using.
      *
@@ -89,15 +119,8 @@ class Application extends \Illuminate\Foundation\Application
     public function environmentFileSite() : string|null
     {
         $this->checkSiteDetection();     
-
-        if(file_exists($sites = $this->joinPaths($this->environmentPath(),'currentsite.txt'))){
-            $site_list = explode("\r\n", file_get_contents($sites));
-            if(!$this->site){
-                $site = $site_list[0];
-            }
-        }
-        return $this->searchForEnvFileSite($site ?? $this->site);
-
+         
+        return $this->searchForEnvFileSite($this->site);
     }
 
     /**
@@ -106,6 +129,58 @@ class Application extends \Illuminate\Foundation\Application
     protected function searchForEnvFileSite($tokens) : string|null
     {
         $file = $this->joinPaths($tokens, '.env');
-        return file_exists(env_path($file)) ? $file : null;
+
+        return file_exists($this->joinPaths($this->environmentPath(), $file)) ? $file : null;
+    }
+
+    /**
+     * Register a service provider with the application.
+     *
+     * @param  \Illuminate\Support\ServiceProvider|string  $provider
+     * @param  bool  $force
+     * @return \Illuminate\Support\ServiceProvider
+     */
+    public function register($provider, $force = false)
+    {
+        if (!in_array($provider, $this->serviceForce) &&  ($registered = $this->getProvider($provider)) && ! $force) {
+            return $registered;
+        }
+
+        // If the given "provider" is a string, we will resolve it, passing in the
+        // application instance automatically for the developer. This is simply
+        // a more convenient way of specifying your service provider classes.
+        if (is_string($provider)) {
+            $provider = $this->resolveProvider($provider);
+        }
+
+        $provider->register();
+
+        // If there are bindings / singletons set as properties on the provider we
+        // will spin through them and register them with the application, which
+        // serves as a convenience layer while registering a lot of bindings.
+        if (property_exists($provider, 'bindings')) {
+            foreach ($provider->bindings as $key => $value) {
+                $this->bind($key, $value);
+            }
+        }
+
+        if (property_exists($provider, 'singletons')) {
+            foreach ($provider->singletons as $key => $value) {
+                $key = is_int($key) ? $value : $key;
+
+                $this->singleton($key, $value);
+            }
+        }
+
+        $this->markAsRegistered($provider);
+
+        // If the application has already booted, we will call this boot method on
+        // the provider class so it has an opportunity to do its boot logic and
+        // will be ready for any usage by this developer's application logic.
+        if ($this->isBooted()) {
+            $this->bootProvider($provider);
+        }
+
+        return $provider;
     }
 }

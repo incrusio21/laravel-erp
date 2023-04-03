@@ -1,12 +1,9 @@
 <?php
 
-namespace Erp\Foundation\Console;
+namespace LaravelErp\Foundation\Console;
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Console\Attribute\AsCommand;
-use function Termwind\terminal;
 
 #[AsCommand(name: 'erp:init')]
 class InitCommand extends Command
@@ -33,14 +30,20 @@ class InitCommand extends Command
     protected $description = 'Initialize Laravel ERP';
 
     /**
+     *
+     * @var boolean
+     */
+    protected $is_init = TRUE;
+
+    /**
      * Execute the console command.
      *
      * @return int
      */
     public function handle()
     {
-        $this->updateSite();
         $this->updateComposer();
+        $this->installingSite();
     }
 
     /**
@@ -49,38 +52,25 @@ class InitCommand extends Command
     protected function updateComposer()
     {
         $list_update = [];
-        // get erp path dan filename
-        $path = config('erp.path');
-        $file = config('erp.composer');
-        $filePath = str_replace(DS,"/", $this->app->joinPaths($path,$file));
-
+        
         $composer = json_decode($this->files->get(base_path('composer.json')));
-        // update composer jika erp composer belum ada
-        if(!property_exists($composer->extra, 'merge-plugin') 
-            || !property_exists($composer->extra->{'merge-plugin'}, 'include')
-            || !in_array($filePath, $composer->extra->{'merge-plugin'}->include)){
- 
-            $list_update += ['addComposer' => function() use ($filePath){   
-                $composer   = json_decode($this->files->get($path = base_path('composer.json')));
         
-                $composer->extra->{'merge-plugin'} = (object) [ 'include' => [ $filePath ] ];
-                $this->updateJsonFile($path, $composer);
-            }];
-        }
-        
+        $fileApp = $this->laravel->joinPaths($this->erp['path'] ?? '', $this->erp['app']);
         // buat folder dan file composer jika folder tidak di temukan
-        if(!$this->files->exists($path)){
-            $list_update += ['addFile' => function () use ($path, $filePath)
+        if(!$this->files->exists($this->erp['path'])){
+            array_push($list_update, function () use ($fileApp)
             {
-                $this->files->makeDirectory($path, 0777, true, true);
+                $this->files->makeDirectory($this->erp['path'], 0777, true, true);
         
-                $this->updateJsonFile($filePath, (object) [ 'autoload' => (object) ['psr-4' => (object) []]]);
-            }];
+                // $this->updateJsonFile($filePath, (object) [ 'autoload' => (object) ['psr-4' => (object) []]]);
+                $this->updateAppsFile($fileApp);
+            });
         }else{
-            $erp_composer = json_decode($this->files->get($filePath));
+            // $erp_composer = json_decode($this->files->get($filePath));
             
+            $app_list = [];
             // cek folder jika merukapan aplikasi
-            foreach ($this->files->directories($path) as $name){
+            foreach ($this->files->directories($this->erp['path']) as $name){
                 if(!$this->files->exists($app = $name.DS.'setup.json')){
                     continue;
                 }
@@ -89,16 +79,18 @@ class InitCommand extends Command
                     continue;
                 }
                 
-                if(!property_exists($erp_composer->autoload->{"psr-4"}, $setup->namespace)){
-                    $erp_json->autoload->{"psr-4"}->{$setup->namespace} = $setup->path;
+                if(!property_exists($composer->autoload->{"psr-4"}, $setup->namespace)){
+                    $composer->autoload->{"psr-4"}->{$setup->namespace} = $this->erp['path'].'/'.$setup->path;
+                    array_push($app_list, $setup->name);
                     $update_composer = 1;
                 }
             }
 
             // tambahkan namespace jika belum ada pada erp composer 
-            if(isset($update_composer)) $list_update += ['updateFile' => function () use ($filePath, $erp_json){
-                $this->updateJsonFile($filePath, $erp_json);
-            }];
+            if(isset($update_composer)) array_push($list_update, function () use ($composer, $fileApp, $app_list){
+                $this->updateJsonFile(base_path('composer.json'), $composer);
+                $this->updateAppsFile($fileApp, $app_list);
+            });
         }
 
         if(!empty($list_update)){
@@ -130,17 +122,18 @@ class InitCommand extends Command
     /**
      * Add Erp Site
      */
-    protected function updateSite()
+    protected function installingSite()
     {
-        if($site = $this->option('site')){
-            // buat folder site jika folder tidak di temukan
-            if(!$this->files->exists(app()->sitePath)){
-                $this->files->makeDirectory(app()->sitePath, 0777, true, true);
-            }
-
+        if($this->hasOption('site') && $site = $this->option('site')){
             $this->call('erp:addsite', [
                 'name' => $site
             ]);
+
+            return;
         }
+
+        $this->call('erp:install', [
+            'app' => 'laravel-erp'
+        ]);
     }
 }

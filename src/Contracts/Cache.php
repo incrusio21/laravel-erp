@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Contracts;
+namespace LaravelErp\Contracts;
 
 use Illuminate\Support\Facades\Cache as LaravelCache;
 
@@ -30,7 +30,7 @@ class Cache
     public function __get(string $property) : mixed 
     {
         if (!array_key_exists($property, $this->data)) {
-            return null;
+            return [];
         }
 
         return $this->data[$property];
@@ -42,7 +42,7 @@ class Cache
      * @param string $property The name of the property to set.
      * @param mixed $value The value to set the property to.
     */
-    public function __set(string $property, mixed $value) : void
+    public function __set($property, mixed $value) : void
     {
         $this->data[$property] = $value;
 

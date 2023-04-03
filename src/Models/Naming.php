@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Models;
+namespace LaravelErp\Models;
 
 class Naming
 {
@@ -20,7 +20,7 @@ class Naming
         }
         // at this point, we fall back to name generation with the hash option
         if (!$doc->name && $autoname == "hash"){
-            $doc->name = app('erp')->generate_hash($doc->doctype, 10);
+            $doc->name = generate_hash($doc->doctype, 10);
         }
     }
 

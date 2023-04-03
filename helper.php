@@ -4,6 +4,26 @@ define('DS', DIRECTORY_SEPARATOR);
 define('VARCHAR_LEN', 140);
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+/**
+ * Generate a hash string for the given text with additional random data and a timestamp.
+ * 
+ * @param string|null $txt The text to be hashed (default: null).
+ * @param int|null $length The length of the output hash (default: null).
+*/
+if (! function_exists('generate_hash')){   
+   function generate_hash($txt = null, $length = null) : string
+   {
+       $digest = Hash::make($txt . time() . Str::random(8));
+       if ($length) {
+           return substr($digest, 0, $length);
+       }
+       
+       return $digest;
+   }
+}
 
 /**
  * Create or update table with migrations.
@@ -13,7 +33,7 @@ use Illuminate\Support\Facades\Cache;
 if (! function_exists('migrate')){
     function migrate(object $cont) : void
     {
-        (new \Erp\Foundation\Migrate)->create_or_update_table($cont); 
+        (new \LaravelErp\Foundation\Migrate)->create_or_update_table($cont); 
     }
 }
 
@@ -26,8 +46,8 @@ if (! function_exists('migrate')){
 if (! function_exists('scrub')){
     function scrub($txt, $slug = TRUE) : string
     {
-        $scrub = str_replace("-", "_", str_replace(" ", "_", $txt));
-        return $slug ? strtolower($scrub) : $scrub;
+        $scrub = str_replace(" ", "-", $txt);
+        return $slug ? str_replace("-", "_", strtolower($scrub)) : $scrub;
     }
 }
 

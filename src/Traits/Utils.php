@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Traits;
+namespace LaravelErp\Traits;
 
 use Exception;
 

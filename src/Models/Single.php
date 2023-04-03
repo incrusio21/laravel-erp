@@ -1,6 +1,6 @@
 <?php
 
-namespace Erp\Models;
+namespace LaravelErp\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

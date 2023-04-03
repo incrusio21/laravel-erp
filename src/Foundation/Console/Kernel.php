@@ -1,6 +1,6 @@
-<?php namespace Erp\Foundation\Console;
+<?php namespace LaravelErp\Foundation\Console;
 
-use Erp\Console\Application as Artisan;
+use LaravelErp\Console\Application as Artisan;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -13,7 +13,7 @@ class Kernel extends \Illuminate\Foundation\Console\Kernel {
 	 * @var array
 	 */
     protected $bootstrappers = [
-        \Erp\Foundation\Bootstrap\DetectSite::class,
+        \LaravelErp\Foundation\Bootstrap\DetectSite::class,
         \Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
         \Illuminate\Foundation\Bootstrap\LoadConfiguration::class,
         \Illuminate\Foundation\Bootstrap\HandleExceptions::class,
@@ -48,22 +48,18 @@ class Kernel extends \Illuminate\Foundation\Console\Kernel {
      * @param  \Symfony\Component\Console\Output\OutputInterface  $outputBuffer
      * @return int
      */
-    public function call($command, array $parameters = [], $outputBuffer = null, $forceBootstrap = false)
+    public function call($command, array $parameters = [], $outputBuffer = null)
     {
-        if ($forceBootstrap) {
+        if($paramSite = Arr::get($parameters,'--site')){
             $argv = isset($_SERVER['argv']) ? $_SERVER['argv'] : [];
-            $argvSite = Arr::first($argv, function ($value) {
-                return Str::startsWith($value, '--site');
-            });
-            echo $argvSite . "----";
-            if (!$argvSite) {
-                $paramSite = Arr::get($parameters,'--site');
-                echo $paramSite . "++++";
-                if ($paramSite) {
-
-                    $_SERVER['argv'][] = $paramSite;
-                }
+            
+            if($siteIndex = array_search('--site', $argv)){
+                $_SERVER['argv'][$siteIndex + 1] = $paramSite;
+            }else{
+                $_SERVER['argv'][] = '--site';
+                $_SERVER['argv'][] = $paramSite;
             }
+
             $this->app->bootstrapWith($this->bootstrappers());
         }
 
